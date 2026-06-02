@@ -1,0 +1,151 @@
+<div class="min-h-dvh w-full bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white">
+  <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-8">
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <h1 class="text-4xl font-black tracking-tight sm:text-5xl">
+        🏀 Arcade <span class="text-orange-400">Basketball</span>
+      </h1>
+      <p class="mt-2 text-lg text-slate-400">Pick your players, choose a mode, and ball out.</p>
+    </header>
+
+    <!-- Game mode -->
+    <section class="mb-8">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Game Mode</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        @for (mode of modes; track mode.id) {
+          <button
+            type="button"
+            (click)="selectedMode.set(mode)"
+            class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
+            [class.border-orange-400]="selectedMode().id === mode.id"
+            [class.border-slate-700]="selectedMode().id !== mode.id"
+            [style.background-color]="selectedMode().id === mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xl font-bold">{{ mode.name }}</span>
+              @if (selectedMode().id === mode.id) {
+                <i class="pi pi-check-circle text-2xl text-orange-400"></i>
+              }
+            </div>
+            <p class="mt-1 text-sm text-slate-400">{{ mode.description }}</p>
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- Hoop player selection -->
+    <section class="mb-8 flex-1">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        @for (hoop of [1, 2]; track hoop) {
+          @let player = hoop === 1 ? hoop1Player() : hoop2Player();
+          <button
+            type="button"
+            (click)="openPicker(hoop === 1 ? 1 : 2)"
+            class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-700 p-6 transition active:scale-[0.98] hover:border-orange-400"
+          >
+            <span class="text-sm font-semibold uppercase tracking-widest text-orange-400">
+              Hoop {{ hoop }}
+            </span>
+            @if (player) {
+              <app-player-badge [player]="player" [size]="80" />
+              <span class="text-2xl font-bold">{{ player.name }}</span>
+              <span class="text-sm text-slate-400">Tap to change</span>
+            } @else {
+              <i class="pi pi-user-plus text-5xl text-slate-600"></i>
+              <span class="text-lg font-semibold text-slate-300">Select Player</span>
+            }
+          </button>
+        }
+      </div>
+    </section>
+
+    <!-- Start -->
+    <div class="sticky bottom-0 pb-2 pt-4">
+      <p-button
+        label="Start Game"
+        icon="pi pi-play"
+        [disabled]="!canStart()"
+        (onClick)="startGame()"
+        styleClass="w-full justify-center !py-5 !text-2xl !font-bold"
+      />
+    </div>
+  </div>
+</div>
+
+<!-- Player picker dialog -->
+<p-dialog
+  [visible]="pickerHoop() !== null"
+  (visibleChange)="$event ? null : closePicker()"
+  [modal]="true"
+  [dismissableMask]="true"
+  [draggable]="false"
+  [style]="{ width: '90vw', maxWidth: '720px' }"
+  [header]="'Select player for Hoop ' + (pickerHoop() ?? '')"
+>
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    @for (player of playerService.players(); track player.id) {
+      @let disabled = player.id === disabledPlayerId();
+      <button
+        type="button"
+        [disabled]="disabled"
+        (click)="selectPlayer(player)"
+        class="flex flex-col items-center gap-2 rounded-xl border-2 border-slate-200 p-4 transition active:scale-95 enabled:hover:border-orange-400 disabled:opacity-40 dark:border-slate-700"
+      >
+        <app-player-badge [player]="player" [size]="64" />
+        <span class="text-center text-base font-semibold">{{ player.name }}</span>
+        @if (disabled) {
+          <span class="text-xs text-slate-400">In other hoop</span>
+        }
+      </button>
+    }
+
+    <!-- Add new player -->
+    @if (!addingPlayer()) {
+      <button
+        type="button"
+        (click)="addingPlayer.set(true)"
+        class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-4 transition active:scale-95 hover:border-orange-400 dark:border-slate-600"
+      >
+        <i class="pi pi-plus text-3xl text-orange-500"></i>
+        <span class="text-base font-semibold">Add Player</span>
+      </button>
+    }
+  </div>
+
+  @if (addingPlayer()) {
+    <div class="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 dark:border-slate-700">
+      <input
+        pInputText
+        [ngModel]="newPlayerName()"
+        (ngModelChange)="newPlayerName.set($event)"
+        (keyup.enter)="addPlayer()"
+        placeholder="New player name"
+        class="w-full !py-3 !text-lg"
+        autofocus
+      />
+      <div class="flex gap-3">
+        <p-button
+          label="Cancel"
+          severity="secondary"
+          [text]="true"
+          (onClick)="addingPlayer.set(false)"
+        />
+        <p-button
+          label="Add & Select"
+          icon="pi pi-check"
+          [loading]="savingPlayer()"
+          [disabled]="!newPlayerName().trim()"
+          (onClick)="addPlayer()"
+          styleClass="flex-1 justify-center"
+        />
+      </div>
+    </div>
+  }
+
+  @if (!playerService.players().length && !addingPlayer()) {
+    <p class="mt-4 text-center text-sm text-slate-500">
+      No players yet — tap “Add Player” to create one.
+    </p>
+  }
+</p-dialog>

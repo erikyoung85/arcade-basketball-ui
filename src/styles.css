@@ -1,3 +1,27 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles. Tailwind v4 + PrimeNG share CSS layers.
+   The layer order below inserts PrimeNG between Tailwind's base and utilities
+   so that Tailwind utility classes always win over PrimeNG component styles.
+   Keep this in sync with the `cssLayer.order` option in app.config.ts. */
+@layer theme, base, primeng, components, utilities;
 
 @import 'tailwindcss';
+@import 'tailwindcss-primeui';
+@import 'primeicons/primeicons.css';
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  /* Touchscreen kiosk: stop long-press text selection / callout on taps. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+/* Inputs still need selection/caret for the rare name-entry case. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

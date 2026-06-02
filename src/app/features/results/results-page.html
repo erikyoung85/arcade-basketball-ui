@@ -1,0 +1,63 @@
+@if (result(); as r) {
+  <div class="min-h-dvh w-full bg-gradient-to-b from-slate-900 to-slate-950 text-white">
+    <div class="mx-auto flex min-h-dvh max-w-4xl flex-col items-center px-6 py-10">
+      <!-- Headline -->
+      <div class="mb-8 text-center">
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
+          {{ r.mode.name }} · Final
+        </span>
+        <h1 class="mt-2 flex items-center justify-center gap-3 text-5xl font-black sm:text-6xl">
+          @if (!r.isTie) {
+            <i class="pi pi-trophy text-yellow-400"></i>
+          }
+          {{ headline() }}
+        </h1>
+      </div>
+
+      <!-- Scoreboard -->
+      <div class="grid w-full flex-1 grid-cols-2 gap-4 sm:gap-6">
+        @for (hoop of [1, 2]; track hoop) {
+          @let isHoop1 = hoop === 1;
+          @let player = isHoop1 ? r.hoop1Player : r.hoop2Player;
+          @let score = isHoop1 ? r.hoop1Score : r.hoop2Score;
+          @let shots = isHoop1 ? r.hoop1Shots : r.hoop2Shots;
+          @let isWinner = !r.isTie && r.winner?.id === player.id;
+          <div
+            class="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 p-8 transition"
+            [class.border-yellow-400]="isWinner"
+            [class.border-slate-700]="!isWinner"
+            [style.background-color]="isWinner ? 'rgba(250,204,21,0.1)' : 'transparent'"
+          >
+            @if (isWinner) {
+              <span class="rounded-full bg-yellow-400 px-4 py-1 text-sm font-bold text-slate-900">
+                WINNER
+              </span>
+            }
+            <app-player-badge [player]="player" [size]="96" />
+            <span class="text-3xl font-bold">{{ player.name }}</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Hoop {{ hoop }}</span>
+            <span class="text-8xl font-black tabular-nums">{{ score }}</span>
+            <span class="text-base text-slate-400">{{ shots }} {{ shots === 1 ? 'basket' : 'baskets' }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Actions -->
+      <div class="mt-10 flex w-full flex-col gap-4 sm:flex-row">
+        <p-button
+          label="New Game"
+          icon="pi pi-home"
+          severity="secondary"
+          (onClick)="newGame()"
+          styleClass="w-full justify-center !py-4 !text-xl"
+        />
+        <p-button
+          label="Play Again"
+          icon="pi pi-replay"
+          (onClick)="playAgain()"
+          styleClass="w-full justify-center !py-4 !text-xl !font-bold"
+        />
+      </div>
+    </div>
+  </div>
+}

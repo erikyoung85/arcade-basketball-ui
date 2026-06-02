@@ -1,0 +1,84 @@
+@if (game.setup(); as setup) {
+  <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
+    <!-- Two hoop tap zones -->
+    <div class="grid flex-1 grid-cols-2">
+      @for (hoop of [1, 2]; track hoop) {
+        @let isHoop1 = hoop === 1;
+        @let player = isHoop1 ? setup.hoop1Player : setup.hoop2Player;
+        @let score = isHoop1 ? game.hoop1Score() : game.hoop2Score();
+        @let shots = isHoop1 ? game.hoop1Shots() : game.hoop2Shots();
+        <button
+          type="button"
+          (click)="recordShot(isHoop1 ? 1 : 2)"
+          [disabled]="game.status() !== 'running'"
+          class="relative flex select-none flex-col items-center justify-center gap-4 transition active:brightness-125"
+          [class.border-r]="isHoop1"
+          [class.border-slate-800]="isHoop1"
+          [style.background]="
+            'radial-gradient(circle at 50% 35%, ' + player.color + '33, transparent 70%)'
+          "
+        >
+          <!-- Player header -->
+          <div class="flex flex-col items-center gap-2">
+            <app-player-badge [player]="player" [size]="64" />
+            <span class="text-2xl font-bold">{{ player.name }}</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Hoop {{ hoop }}
+            </span>
+          </div>
+
+          <!-- Score -->
+          <div class="text-center leading-none">
+            <span class="block text-[7rem] font-black tabular-nums sm:text-[10rem]">{{ score }}</span>
+            <span class="text-lg text-slate-400">{{ shots }} {{ shots === 1 ? 'basket' : 'baskets' }}</span>
+          </div>
+
+          @if (game.status() === 'running') {
+            <span class="rounded-full bg-white/10 px-6 py-2 text-xl font-bold text-orange-300">
+              TAP TO SCORE +2
+            </span>
+          }
+
+          <!-- Undo -->
+          @if (shots > 0 && game.status() === 'running') {
+            <button
+              type="button"
+              (click)="undoShot($event, isHoop1 ? 1 : 2)"
+              class="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition active:scale-90 hover:bg-white/20"
+              aria-label="Undo last basket"
+            >
+              <i class="pi pi-undo text-xl"></i>
+            </button>
+          }
+        </button>
+      }
+    </div>
+
+    <!-- Timer header (overlay, centered top) -->
+    <div class="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2">
+      <div class="flex flex-col items-center rounded-2xl bg-slate-900/80 px-8 py-3 shadow-lg ring-1 ring-white/10 backdrop-blur">
+        <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ setup.mode.name }}</span>
+        <span
+          class="text-5xl font-black tabular-nums"
+          [class.text-red-500]="game.secondsRemaining() <= 5"
+        >
+          {{ game.secondsRemaining() }}
+        </span>
+        <div class="mt-1 h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
+          <div
+            class="h-full bg-orange-400 transition-[width] duration-100 ease-linear"
+            [style.width.%]="(1 - game.progress()) * 100"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pre-game countdown overlay -->
+    @if (game.status() === 'countdown') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Get Ready</span>
+        <span class="text-[12rem] font-black leading-none text-white">{{ game.countdownValue() }}</span>
+      </div>
+    }
+  </div>
+}
