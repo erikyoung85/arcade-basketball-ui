@@ -22,7 +22,9 @@
             class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
             [class.border-orange-400]="selectedMode().id === mode.id"
             [class.border-slate-700]="selectedMode().id !== mode.id"
-            [style.background-color]="selectedMode().id === mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'"
+            [style.background-color]="
+              selectedMode().id === mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'
+            "
           >
             <div class="flex items-center justify-between">
               <span class="text-xl font-bold">{{ mode.name }}</span>
@@ -39,7 +41,7 @@
     <!-- Hoop player selection -->
     <section class="mb-8">
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 grid-cols-2">
         @for (hoop of [1, 2]; track hoop) {
           @let player = hoop === 1 ? hoop1Player() : hoop2Player();
           <button

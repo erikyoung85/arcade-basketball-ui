@@ -22,5 +22,5 @@ export const environment = {
   production: false,
   supabaseUrl: 'https://ulqlllosknuyhjasvtci.supabase.co',
   supabasePublishableKey: 'sb_publishable_ojLGNeAS8kqVw47wCo4ydQ_WBA0xi42',
-  mqttBrokerUrl: 'ws://192.168.1.139:9001',
+  mqttBrokerUrl: 'ws://raspberrypi.local/mqtt',
 };
