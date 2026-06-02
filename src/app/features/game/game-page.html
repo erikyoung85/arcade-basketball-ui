@@ -1,17 +1,14 @@
 @if (game.setup(); as setup) {
   <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
-    <!-- Two hoop tap zones -->
+    <!-- Two hoop score panels (driven by the hoop sensors over MQTT) -->
     <div class="grid flex-1 grid-cols-2">
       @for (hoop of [1, 2]; track hoop) {
         @let isHoop1 = hoop === 1;
         @let player = isHoop1 ? setup.hoop1Player : setup.hoop2Player;
         @let score = isHoop1 ? game.hoop1Score() : game.hoop2Score();
         @let shots = isHoop1 ? game.hoop1Shots() : game.hoop2Shots();
-        <button
-          type="button"
-          (click)="recordShot(isHoop1 ? 1 : 2)"
-          [disabled]="game.status() !== 'running'"
-          class="relative flex select-none flex-col items-center justify-center gap-4 transition active:brightness-125"
+        <div
+          class="relative flex select-none flex-col items-center justify-center gap-4 transition"
           [class.border-r]="isHoop1"
           [class.border-slate-800]="isHoop1"
           [style.background]="
@@ -33,25 +30,24 @@
             <span class="text-lg text-slate-400">{{ shots }} {{ shots === 1 ? 'basket' : 'baskets' }}</span>
           </div>
 
-          @if (game.status() === 'running') {
-            <span class="rounded-full bg-white/10 px-6 py-2 text-xl font-bold text-orange-300">
-              TAP TO SCORE +2
-            </span>
-          }
-
-          <!-- Undo -->
+          <!-- Undo (corrects a false sensor read) -->
           @if (shots > 0 && game.status() === 'running') {
             <button
               type="button"
-              (click)="undoShot($event, isHoop1 ? 1 : 2)"
+              (click)="undoShot(isHoop1 ? 1 : 2)"
               class="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition active:scale-90 hover:bg-white/20"
               aria-label="Undo last basket"
             >
               <i class="pi pi-undo text-xl"></i>
             </button>
           }
-        </button>
+        </div>
       }
+    </div>
+
+    <!-- Sensor connection status (overlay, top-left) -->
+    <div class="absolute left-4 top-4">
+      <app-mqtt-status-indicator />
     </div>
 
     <!-- Timer header (overlay, centered top) -->

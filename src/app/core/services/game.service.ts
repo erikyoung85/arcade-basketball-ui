@@ -1,5 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
+
 import { SupabaseService } from '../supabase/supabase.client';
+import { MqttService } from './mqtt.service';
 import { GameResult, GameSetup, GameStatus, HoopId } from '../models/game.model';
 
 /** Length of the pre-game "3 · 2 · 1 · GO" countdown, in seconds. */
@@ -18,6 +21,7 @@ const TICK_MS = 100;
 @Injectable({ providedIn: 'root' })
 export class GameService {
   private readonly supabase = inject(SupabaseService);
+  private readonly mqtt = inject(MqttService);
 
   private readonly _setup = signal<GameSetup | null>(null);
   private readonly _status = signal<GameStatus>('idle');
@@ -54,6 +58,7 @@ export class GameService {
   );
 
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private shotSub: Subscription | null = null;
 
   /** Store the setup chosen on the landing page. */
   configure(setup: GameSetup): void {
@@ -73,6 +78,10 @@ export class GameService {
     this._status.set('countdown');
     this._countdownValue.set(COUNTDOWN_SECONDS);
 
+    // Open the broker link now so it's ready by the time play begins. Shots
+    // are ignored until the status is 'running' (see recordShot).
+    this.startListeningForShots();
+
     this.clearTimer();
     this.intervalId = setInterval(() => {
       const next = this._countdownValue() - 1;
@@ -85,7 +94,10 @@ export class GameService {
     }, 1000);
   }
 
-  /** Record a made shot on the given hoop while the game is running. */
+  /**
+   * Record a made shot on the given hoop while the game is running. Driven by
+   * `basketball/shots` events from the MQTT broker (see startListeningForShots).
+   */
   recordShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
     if (hoop === 1) {
@@ -95,7 +107,7 @@ export class GameService {
     }
   }
 
-  /** Undo the most recent made shot on a hoop (touchscreen mis-tap fix). */
+  /** Undo the most recent made shot on a hoop (corrects a false sensor read). */
   undoShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
     if (hoop === 1) {
@@ -108,6 +120,7 @@ export class GameService {
   /** Reset everything back to idle (e.g. when leaving the game). */
   reset(): void {
     this.clearTimer();
+    this.stopListeningForShots();
     this._setup.set(null);
     this._status.set('idle');
     this._hoop1Shots.set(0);
@@ -138,6 +151,7 @@ export class GameService {
 
   private finish(): void {
     this.clearTimer();
+    this.stopListeningForShots();
     const setup = this._setup();
     if (!setup) return;
 
@@ -194,5 +208,19 @@ export class GameService {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+  }
+
+  /** Connect to the broker and route incoming shot events into the score. */
+  private startListeningForShots(): void {
+    this.mqtt.connect();
+    this.shotSub?.unsubscribe();
+    this.shotSub = this.mqtt.shots$.subscribe((event) => this.recordShot(event.hoop));
+  }
+
+  /** Tear down the shot subscription and close the broker connection. */
+  private stopListeningForShots(): void {
+    this.shotSub?.unsubscribe();
+    this.shotSub = null;
+    this.mqtt.disconnect();
   }
 }

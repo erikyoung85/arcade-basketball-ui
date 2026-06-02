@@ -7,10 +7,13 @@ import { InputText } from 'primeng/inputtext';
 
 import { PlayerService } from '../../core/services/player.service';
 import { GameService } from '../../core/services/game.service';
+import { MqttService } from '../../core/services/mqtt.service';
 import { DEFAULT_GAME_MODE, GAME_MODES, GameMode } from '../../core/models/game-mode.model';
 import { HoopId } from '../../core/models/game.model';
 import { Player } from '../../core/models/player.model';
 import { PlayerBadge } from '../../shared/player-badge';
+import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
+import { Leaderboard } from '../leaderboard/leaderboard';
 
 /**
  * Landing page. The operator picks a player for each hoop and a game mode,
@@ -19,7 +22,7 @@ import { PlayerBadge } from '../../shared/player-badge';
  */
 @Component({
   selector: 'app-setup-page',
-  imports: [FormsModule, Button, Dialog, InputText, PlayerBadge],
+  imports: [FormsModule, Button, Dialog, InputText, PlayerBadge, MqttStatusIndicator, Leaderboard],
   templateUrl: './setup-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -27,6 +30,7 @@ export class SetupPage {
   private readonly router = inject(Router);
   protected readonly playerService = inject(PlayerService);
   private readonly game = inject(GameService);
+  protected readonly mqtt = inject(MqttService);
 
   protected readonly modes = GAME_MODES;
   protected readonly selectedMode = signal<GameMode>(DEFAULT_GAME_MODE);
@@ -34,15 +38,28 @@ export class SetupPage {
   protected readonly hoop1Player = signal<Player | null>(null);
   protected readonly hoop2Player = signal<Player | null>(null);
 
+  constructor() {
+    // Establish the broker link up front so the operator can see sensor
+    // status here and can't start a game until the hoops are connected.
+    this.mqtt.connect();
+  }
+
   /** Which hoop the picker dialog is choosing for (null = closed). */
   protected readonly pickerHoop = signal<HoopId | null>(null);
   protected readonly addingPlayer = signal(false);
   protected readonly newPlayerName = signal('');
   protected readonly savingPlayer = signal(false);
 
-  protected readonly canStart = computed(
+  /** Both hoops have a player assigned. */
+  protected readonly playersReady = computed(
     () => !!this.hoop1Player() && !!this.hoop2Player(),
   );
+
+  /** The hoop sensors are reachable over MQTT. */
+  protected readonly sensorsReady = computed(() => this.mqtt.status() === 'connected');
+
+  /** A game may only start with both players chosen and sensors connected. */
+  protected readonly canStart = computed(() => this.playersReady() && this.sensorsReady());
 
   protected openPicker(hoop: HoopId): void {
     this.addingPlayer.set(false);
@@ -91,7 +108,7 @@ export class SetupPage {
   protected startGame(): void {
     const hoop1Player = this.hoop1Player();
     const hoop2Player = this.hoop2Player();
-    if (!hoop1Player || !hoop2Player) return;
+    if (!hoop1Player || !hoop2Player || !this.sensorsReady()) return;
 
     this.game.configure({ mode: this.selectedMode(), hoop1Player, hoop2Player });
     void this.router.navigate(['/game']);

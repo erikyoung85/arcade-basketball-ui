@@ -2,6 +2,9 @@
   <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-8">
     <!-- Header -->
     <header class="mb-8 text-center">
+      <div class="mb-4 flex justify-center">
+        <app-mqtt-status-indicator />
+      </div>
       <h1 class="text-4xl font-black tracking-tight sm:text-5xl">
         🏀 Arcade <span class="text-orange-400">Basketball</span>
       </h1>
@@ -34,7 +37,7 @@
     </section>
 
     <!-- Hoop player selection -->
-    <section class="mb-8 flex-1">
+    <section class="mb-8">
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
       <div class="grid gap-4 sm:grid-cols-2">
         @for (hoop of [1, 2]; track hoop) {
@@ -60,8 +63,18 @@
       </div>
     </section>
 
+    <!-- Leaderboard -->
+    <div class="mb-8 flex-1">
+      <app-leaderboard [mode]="selectedMode()" />
+    </div>
+
     <!-- Start -->
     <div class="sticky bottom-0 pb-2 pt-4">
+      @if (playersReady() && !sensorsReady()) {
+        <p class="mb-2 text-center text-sm font-semibold text-red-400">
+          Waiting for the hoop sensors to connect…
+        </p>
+      }
       <p-button
         label="Start Game"
         icon="pi pi-play"

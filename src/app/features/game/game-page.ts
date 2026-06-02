@@ -4,16 +4,18 @@ import { Router } from '@angular/router';
 import { GameService } from '../../core/services/game.service';
 import { HoopId } from '../../core/models/game.model';
 import { PlayerBadge } from '../../shared/player-badge';
+import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
 
 /**
  * Active game screen. Drives the pre-game countdown then the game clock via
- * GameService. Each hoop panel is one big tap target that records a made shot;
- * a small undo button corrects mis-taps. When the game finishes the user is
- * routed to the results page.
+ * GameService. Scores are driven by the basketball hoop sensors over MQTT
+ * (see GameService/MqttService); each hoop panel just displays its live score,
+ * with a small undo button to correct the occasional false sensor read. When
+ * the game finishes the user is routed to the results page.
  */
 @Component({
   selector: 'app-game-page',
-  imports: [PlayerBadge],
+  imports: [PlayerBadge, MqttStatusIndicator],
   templateUrl: './game-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -38,12 +40,7 @@ export class GamePage {
     });
   }
 
-  protected recordShot(hoop: HoopId): void {
-    this.game.recordShot(hoop);
-  }
-
-  protected undoShot(event: Event, hoop: HoopId): void {
-    event.stopPropagation();
+  protected undoShot(hoop: HoopId): void {
     this.game.undoShot(hoop);
   }
 }
