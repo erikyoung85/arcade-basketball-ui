@@ -20,7 +20,7 @@ echo "🔨 Building Angular project..."
 cd "$PROJECT_DIR"
 
 npm install
-ng build --configuration production --base-href /arcadebasketball/
+npm run build:raspberrypi
 
 echo "✅ Build complete"
 
