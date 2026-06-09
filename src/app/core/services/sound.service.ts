@@ -56,7 +56,40 @@ const BACKGROUND_MUSIC: BackgroundTrack[] = [
   { src: '/sounds/music/jump-up-super-star.mp3', volume: 0.35, startSeconds: 30 },
 ];
 
-type SoundName = 'countdown' | 'backgroundMusic';
+/**
+ * The "10 seconds left" warning, played once when the clock reaches 0:10.
+ *
+ * By default it's spoken with the browser's free built-in text-to-speech
+ * (Web Speech API) — no audio file needed. To use a recording instead, set
+ * `src` to a file under `public/` or a public URL; that takes priority. If
+ * neither TTS nor a file is available, a short alert beep plays.
+ */
+const TEN_SECOND_WARNING = {
+  /** Spoken via the browser's free text-to-speech when `src` is empty. */
+  text: '10 seconds left',
+  /** Optional audio file/URL to play INSTEAD of text-to-speech. */
+  src: '',
+  /** Volume, 0–1. */
+  volume: 1,
+};
+
+/**
+ * The final "3 · 2 · 1" countdown, announced once per second over the last
+ * three seconds of the game.
+ *
+ * By default each number is spoken with the browser's free text-to-speech.
+ * To use recordings, add entries to `src` keyed by the number — e.g.
+ * `{ 3: '/sounds/three.mp3', 2: '/sounds/two.mp3', 1: '/sounds/one.mp3' }`.
+ * Any number without a recording falls back to speech, then to a beep.
+ */
+const END_COUNTDOWN = {
+  /** Optional recordings keyed by the number being announced. */
+  src: {} as Record<number, string>,
+  /** Volume, 0–1. */
+  volume: 1,
+};
+
+type SoundName = 'countdown' | 'backgroundMusic' | 'tenSecondWarning' | 'endCountdown';
 
 /**
  * Plays the game's sound effects and background music.
@@ -138,8 +171,50 @@ export class SoundService {
     this.stop('backgroundMusic');
   }
 
+  /** Speak/play the one-shot "10 seconds left" warning. */
+  playTenSecondWarning(): void {
+    const config = TEN_SECOND_WARNING;
+    this.announce('tenSecondWarning', config.text, config.src, config.volume);
+  }
+
+  /** Announce one number of the final 3·2·1 countdown. */
+  playEndCountdown(n: number): void {
+    this.announce('endCountdown', String(n), END_COUNTDOWN.src[n] ?? '', END_COUNTDOWN.volume);
+  }
+
+  /**
+   * Play a spoken announcement: a recording if `src` is given, otherwise the
+   * browser's free text-to-speech, otherwise a synthesized beep.
+   */
+  private announce(name: SoundName, text: string, src: string, volume: number): void {
+    // A recording was provided — it takes priority over text-to-speech.
+    if (src) {
+      this.stop(name);
+      const audio = new Audio(src);
+      audio.volume = volume;
+      this.elements.set(name, audio);
+      audio.addEventListener('error', () => this.fallbackToSynth(name, volume));
+      audio.play().catch(() => this.fallbackToSynth(name, volume));
+      return;
+    }
+
+    // Free, file-less text-to-speech via the Web Speech API.
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
+    if (synth && typeof SpeechSynthesisUtterance !== 'undefined') {
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.volume = volume;
+      synth.speak(utterance);
+      return;
+    }
+
+    // No TTS available (e.g. a bare Chromium with no voices) — beep instead.
+    this.playSynth(name, volume);
+  }
+
   /** Stop every sound. Call when leaving the game screen. */
   stopAll(): void {
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
     for (const name of [...this.elements.keys()]) this.stop(name);
     for (const name of [...this.synthStops.keys()]) this.stop(name);
   }
@@ -178,8 +253,42 @@ export class SoundService {
 
   private playSynth(name: SoundName, volume: number): void {
     this.stop(name);
-    const stop = name === 'countdown' ? this.synthCountdown(volume) : this.synthMusic(volume);
+    let stop: () => void;
+    switch (name) {
+      case 'countdown':
+        stop = this.synthCountdown(volume);
+        break;
+      case 'backgroundMusic':
+        stop = this.synthMusic(volume);
+        break;
+      case 'tenSecondWarning':
+        stop = this.synthAlert(volume, [0, 0.22]); // two beeps
+        break;
+      default: // endCountdown — a single beep per number
+        stop = this.synthAlert(volume, [0]);
+        break;
+    }
     this.synthStops.set(name, stop);
+  }
+
+  /** Short high beep(s) — fallback alert at each given offset (seconds). */
+  private synthAlert(volume: number, offsets: number[]): () => void {
+    const ctx = this.ctx();
+    const start = ctx.currentTime;
+    const oscs = offsets.map((at) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 1175;
+      gain.gain.setValueAtTime(0.0001, start + at);
+      gain.gain.exponentialRampToValueAtTime(volume, start + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 0.15);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start + at);
+      osc.stop(start + at + 0.2);
+      return osc;
+    });
+    return () => oscs.forEach((o) => o.stop());
   }
 
   /** Mario-Kart-style countdown: three low beeps then a higher "GO". */

@@ -51,6 +51,26 @@ export class GamePage {
       }
     });
 
+    // Speak the "10 seconds left" warning once, when the clock reaches 0:10.
+    // Guarded so it fires a single time even as the signal ticks down.
+    let warned = false;
+    effect(() => {
+      if (this.game.status() === 'running' && this.game.secondsRemaining() === 10 && !warned) {
+        warned = true;
+        this.sound.playTenSecondWarning();
+      }
+    });
+
+    // Announce the final "3 · 2 · 1" countdown, each number once.
+    const counted = new Set<number>();
+    effect(() => {
+      const n = this.game.secondsRemaining();
+      if (this.game.status() === 'running' && n <= 3 && n >= 1 && !counted.has(n)) {
+        counted.add(n);
+        this.sound.playEndCountdown(n);
+      }
+    });
+
     // Stop any audio if the user navigates away mid-game.
     inject(DestroyRef).onDestroy(() => this.sound.stopAll());
   }

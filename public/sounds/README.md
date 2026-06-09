@@ -9,6 +9,29 @@ Plays once during the 3·2·1 pre-game countdown. Drop your clip at
 `public/sounds/countdown.m4a` (Mario Kart countdown goes here), or change its
 `src` to any public URL. Until a file is present, a synthesized beep plays.
 
+## "10 seconds left" warning (`TEN_SECOND_WARNING`)
+
+Plays once when the game clock reaches 0:10. By default it's **spoken with the
+browser's free built-in text-to-speech** — no audio file needed. Change the
+spoken phrase via its `text` field. To use a recording instead, set `src` to a
+file under `public/` or a public URL (that takes priority over speech). If a
+device has no TTS voices and no file, a short alert beep plays.
+
+## Final "3 · 2 · 1" countdown (`END_COUNTDOWN`)
+
+Announces each number once over the last three seconds of the game. By default
+each number is **spoken with the browser's free text-to-speech**. To use
+recordings, add entries to `src` keyed by the number:
+
+```ts
+const END_COUNTDOWN = {
+  src: { 3: '/sounds/three.mp3', 2: '/sounds/two.mp3', 1: '/sounds/one.mp3' },
+  volume: 1,
+};
+```
+
+Any number without a recording falls back to speech, then to a beep.
+
 ## Background music (`BACKGROUND_MUSIC`)
 
 A **pool** of tracks. When a game starts, one is chosen at random and looped
