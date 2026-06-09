@@ -3,6 +3,11 @@
 The game's audio is configured in
 [`src/app/core/services/sound.service.ts`](../../src/app/core/services/sound.service.ts).
 
+> **Local paths must be relative** (e.g. `sounds/countdown.m4a`, no leading
+> slash). They're resolved against the app's `<base href>` so audio loads in
+> both `npm start` (base `/`) and the Raspberry Pi build (base
+> `/arcadebasketball/`). Full `https://` URLs are used as-is.
+
 ## Countdown sound (`SOUND_CONFIG.countdown`)
 
 Plays once during the 3·2·1 pre-game countdown. Drop your clip at
@@ -25,7 +30,7 @@ recordings, add entries to `src` keyed by the number:
 
 ```ts
 const END_COUNTDOWN = {
-  src: { 3: '/sounds/three.mp3', 2: '/sounds/two.mp3', 1: '/sounds/one.mp3' },
+  src: { 3: 'sounds/three.mp3', 2: 'sounds/two.mp3', 1: 'sounds/one.mp3' },
   volume: 1,
 };
 ```
@@ -42,9 +47,9 @@ until the game ends. Add as many as you want:
 
 ```ts
 const BACKGROUND_MUSIC: BackgroundTrack[] = [
-  { src: '/sounds/music/track-1.mp3', volume: 0.35, startSeconds: 0 },
+  { src: 'sounds/music/track-1.mp3', volume: 0.35, startSeconds: 0 },
   // Start 12s in and loop back at 48s (skips a long intro/outro):
-  { src: '/sounds/music/track-2.mp3', volume: 0.35, startSeconds: 12, endSeconds: 48 },
+  { src: 'sounds/music/track-2.mp3', volume: 0.35, startSeconds: 12, endSeconds: 48 },
   // A public URL works too:
   { src: 'https://example.com/track.mp3', volume: 0.4, startSeconds: 0 },
 ];
@@ -54,7 +59,7 @@ Each track field:
 
 | Field          | Meaning                                                                 |
 | -------------- | ----------------------------------------------------------------------- |
-| `src`          | Path under `public/` or a full public URL.                              |
+| `src`          | Relative path under `public/` (no leading slash) or a full public URL.  |
 | `volume`       | `0` (silent) – `1` (full). Music defaults to `0.35` to sit under play.  |
 | `startSeconds` | Where playback begins within the file.                                  |
 | `endSeconds`   | Optional. Loops back to `startSeconds` here. Omit to loop the whole file. |

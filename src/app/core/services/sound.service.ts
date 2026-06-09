@@ -2,13 +2,16 @@ import { Injectable } from '@angular/core';
 
 /**
  * A one-shot sound effect. Set `src` to swap the audio with your own:
- *  - drop a file in `public/sounds/` and point at it, e.g. '/sounds/countdown.m4a'
+ *  - drop a file in `public/sounds/` and point at it, e.g. 'sounds/countdown.m4a'
  *  - or paste any public URL, e.g. 'https://example.com/countdown.mp3'
  *  - or leave `src` empty ('') to use the built-in synthesized fallback so the
  *    game still has sound with no audio files present.
+ *
+ * Local paths must be RELATIVE (no leading slash) so they resolve against the
+ * app's <base href> and work under any deployment base path (see resolveSrc).
  */
 interface SoundSource {
-  /** Path under `public/` or a full public URL. Empty = synth fallback. */
+  /** Relative path under `public/` (no leading slash) or a full public URL. */
   src: string;
   /** Playback volume, 0–1. */
   volume: number;
@@ -22,7 +25,7 @@ interface SoundSource {
  * ends. Add as many as you like — see `public/sounds/README.md`.
  */
 interface BackgroundTrack {
-  /** Path under `public/` (e.g. '/sounds/music/track-1.mp3') or a full URL. */
+  /** Relative path under `public/` (e.g. 'sounds/music/track-1.mp3') or a full URL. */
   src: string;
   /** Playback volume, 0–1. */
   volume: number;
@@ -43,7 +46,7 @@ interface BackgroundTrack {
  *             public/sounds/countdown.m4a. Until then a beep plays.
  */
 const SOUND_CONFIG = {
-  countdown: { src: '/sounds/countdown.m4a', volume: 0.9, loop: false },
+  countdown: { src: 'sounds/countdown.m4a', volume: 0.9, loop: false },
 } satisfies Record<string, SoundSource>;
 
 /**
@@ -53,7 +56,7 @@ const SOUND_CONFIG = {
  * synthesized loop plays instead.
  */
 const BACKGROUND_MUSIC: BackgroundTrack[] = [
-  { src: '/sounds/music/jump-up-super-star.mp3', volume: 0.35, startSeconds: 30 },
+  { src: 'sounds/music/jump-up-super-star.mp3', volume: 0.35, startSeconds: 30 },
 ];
 
 /**
@@ -79,7 +82,7 @@ const TEN_SECOND_WARNING = {
  *
  * By default each number is spoken with the browser's free text-to-speech.
  * To use recordings, add entries to `src` keyed by the number — e.g.
- * `{ 3: '/sounds/three.mp3', 2: '/sounds/two.mp3', 1: '/sounds/one.mp3' }`.
+ * `{ 3: 'sounds/three.mp3', 2: 'sounds/two.mp3', 1: 'sounds/one.mp3' }`.
  * Any number without a recording falls back to speech, then to a beep.
  */
 const END_COUNTDOWN = {
@@ -119,7 +122,7 @@ export class SoundService {
       return;
     }
     this.stop('countdown');
-    const audio = new Audio(config.src);
+    const audio = new Audio(this.resolveSrc(config.src));
     audio.volume = config.volume;
     audio.loop = config.loop;
     this.elements.set('countdown', audio);
@@ -140,7 +143,7 @@ export class SoundService {
     const start = track.startSeconds || 0;
     const end = track.endSeconds && track.endSeconds > start ? track.endSeconds : null;
 
-    const audio = new Audio(track.src);
+    const audio = new Audio(this.resolveSrc(track.src));
     audio.volume = track.volume;
     this.elements.set('backgroundMusic', audio);
 
@@ -190,7 +193,7 @@ export class SoundService {
     // A recording was provided — it takes priority over text-to-speech.
     if (src) {
       this.stop(name);
-      const audio = new Audio(src);
+      const audio = new Audio(this.resolveSrc(src));
       audio.volume = volume;
       this.elements.set(name, audio);
       audio.addEventListener('error', () => this.fallbackToSynth(name, volume));
@@ -220,6 +223,16 @@ export class SoundService {
   }
 
   // --- internals -----------------------------------------------------------
+
+  /**
+   * Resolve a configured `src` against the app's `<base href>` so audio loads
+   * correctly under any deployment base path — dev ('/') and the Raspberry Pi
+   * production build ('/arcadebasketball/', set via `--base-href`). Relative
+   * paths (e.g. 'sounds/x.mp3') pick up the base; full URLs are left unchanged.
+   */
+  private resolveSrc(src: string): string {
+    return new URL(src, document.baseURI).href;
+  }
 
   private stop(name: SoundName): void {
     const audio = this.elements.get(name);
