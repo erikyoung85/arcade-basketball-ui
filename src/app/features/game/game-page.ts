@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GameService } from '../../core/services/game.service';
+import { SoundService } from '../../core/services/sound.service';
 import { HoopId } from '../../core/models/game.model';
 import { PlayerBadge } from '../../shared/player-badge';
 import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
@@ -22,6 +23,7 @@ import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
 export class GamePage {
   private readonly router = inject(Router);
   protected readonly game = inject(GameService);
+  private readonly sound = inject(SoundService);
 
   constructor() {
     // No setup means the user deep-linked here — send them back to start.
@@ -32,12 +34,25 @@ export class GamePage {
 
     this.game.startCountdown();
 
-    // When the clock hits zero the game finishes; move to the results screen.
+    // Drive audio off the game status. Reads only status(), so this runs once
+    // per transition: countdown sound on the 3·2·1, music while playing.
     effect(() => {
-      if (this.game.status() === 'finished') {
-        void this.router.navigate(['/results']);
+      switch (this.game.status()) {
+        case 'countdown':
+          this.sound.playCountdown();
+          break;
+        case 'running':
+          this.sound.startBackgroundMusic();
+          break;
+        case 'finished':
+          this.sound.stopAll();
+          void this.router.navigate(['/results']);
+          break;
       }
     });
+
+    // Stop any audio if the user navigates away mid-game.
+    inject(DestroyRef).onDestroy(() => this.sound.stopAll());
   }
 
   protected undoShot(hoop: HoopId): void {
