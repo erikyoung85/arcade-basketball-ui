@@ -1,16 +1,18 @@
 @if (game.setup(); as setup) {
   <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
-    <!-- Two hoop score panels (driven by the hoop sensors over MQTT) -->
-    <div class="grid flex-1 grid-cols-2">
+    <!-- Hoop score panels (driven by the hoop sensors over MQTT). A solo game
+         shows just the one manned hoop, full width. -->
+    <div class="grid flex-1" [class.grid-cols-2]="!game.isSinglePlayer()">
       @for (hoop of [1, 2]; track hoop) {
         @let isHoop1 = hoop === 1;
         @let player = isHoop1 ? setup.hoop1Player : setup.hoop2Player;
         @let score = isHoop1 ? game.hoop1Score() : game.hoop2Score();
         @let shots = isHoop1 ? game.hoop1Shots() : game.hoop2Shots();
+        @if (player) {
         <div
           class="relative flex select-none flex-col items-center justify-center gap-4 transition"
-          [class.border-r]="isHoop1"
-          [class.border-slate-800]="isHoop1"
+          [class.border-r]="isHoop1 && !game.isSinglePlayer()"
+          [class.border-slate-800]="isHoop1 && !game.isSinglePlayer()"
           [style.background]="
             'radial-gradient(circle at 50% 35%, ' + player.color + '33, transparent 70%)'
           "
@@ -42,6 +44,7 @@
             </button>
           }
         </div>
+        }
       }
     </div>
 

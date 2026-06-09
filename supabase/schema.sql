@@ -21,8 +21,10 @@ create table if not exists public.games (
   id                uuid primary key default gen_random_uuid(),
   mode              text not null,
   duration_seconds  int  not null,
-  hoop1_player_id   uuid not null references public.players (id),
-  hoop2_player_id   uuid not null references public.players (id),
+  -- Nullable: a single-player game leaves the unmanned hoop's player empty.
+  -- At least one is always set (enforced by the app).
+  hoop1_player_id   uuid references public.players (id),
+  hoop2_player_id   uuid references public.players (id),
   hoop1_score       int  not null default 0,
   hoop2_score       int  not null default 0,
   hoop1_shots       int  not null default 0,
@@ -55,3 +57,12 @@ create policy "games anon full access"
   to anon
   using (true)
   with check (true);
+
+-- ---------------------------------------------------------------------------
+-- Migration: allow single-player games
+-- Run this against an existing database to let one hoop be left unmanned.
+-- (Adjust the schema name to match your project — the app uses
+-- the `arcade_basketball` schema; swap `public` below if yours differs.)
+-- ---------------------------------------------------------------------------
+alter table public.games alter column hoop1_player_id drop not null;
+alter table public.games alter column hoop2_player_id drop not null;

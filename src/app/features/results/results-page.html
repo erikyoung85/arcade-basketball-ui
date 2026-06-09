@@ -14,14 +14,15 @@
         </h1>
       </div>
 
-      <!-- Scoreboard -->
-      <div class="grid w-full flex-1 grid-cols-2 gap-4 sm:gap-6">
+      <!-- Scoreboard. A solo game shows just the one manned hoop. -->
+      <div class="grid w-full flex-1 gap-4 sm:gap-6" [class.grid-cols-2]="!r.isSinglePlayer">
         @for (hoop of [1, 2]; track hoop) {
           @let isHoop1 = hoop === 1;
           @let player = isHoop1 ? r.hoop1Player : r.hoop2Player;
           @let score = isHoop1 ? r.hoop1Score : r.hoop2Score;
           @let shots = isHoop1 ? r.hoop1Shots : r.hoop2Shots;
-          @let isWinner = !r.isTie && r.winner?.id === player.id;
+          @let isWinner = !r.isTie && !r.isSinglePlayer && r.winner?.id === player?.id;
+          @if (player) {
           <div
             class="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 p-8 transition"
             [class.border-yellow-400]="isWinner"
@@ -38,7 +39,23 @@
             <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Hoop {{ hoop }}</span>
             <span class="text-8xl font-black tabular-nums">{{ score }}</span>
             <span class="text-base text-slate-400">{{ shots }} {{ shots === 1 ? 'basket' : 'baskets' }}</span>
+
+            <!-- Leaderboard placement -->
+            <div class="mt-2 flex min-h-20 flex-col items-center text-center">
+              @if (placements.isLoading()) {
+                <span class="text-sm text-slate-400">Checking the leaderboard…</span>
+              } @else if (placementFor(isHoop1 ? 1 : 2); as place) {
+                @if (medal(place); as medalEmoji) {
+                  <span class="text-5xl leading-none">{{ medalEmoji }}</span>
+                  <span class="mt-1 text-xl font-black">{{ ordinal(place) }} place</span>
+                } @else {
+                  <span class="text-2xl font-black">{{ ordinal(place) }} place</span>
+                }
+                <span class="mt-0.5 text-xs text-slate-400">{{ r.mode.name }} leaderboard</span>
+              }
+            </div>
           </div>
+          }
         }
       </div>
 

@@ -72,6 +72,42 @@ export class LeaderboardService {
     );
     return entries.slice(0, limit);
   }
+
+  /**
+   * The 1-based placement a score earns on a mode's leaderboard (1 = top).
+   * Ranking matches {@link topScores}: every recorded hoop performance counts,
+   * and ties are broken by recency, so a freshly-played score sits below any
+   * equal earlier one.
+   *
+   * Assumes the score being ranked has *already been persisted* — its own row
+   * is counted, which is what makes the arithmetic land on the right place.
+   * Returns null when Supabase is not configured.
+   */
+  async placementForScore(mode: GameModeId, score: number): Promise<number | null> {
+    const client = this.supabase.client;
+    if (!client) {
+      return null;
+    }
+
+    const { data, error } = await client
+      .from('games')
+      .select('hoop1_score, hoop2_score, hoop1_player_id, hoop2_player_id')
+      .eq('mode', mode);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Count every performance that ranks at or above this score. With the
+    // score's own row included (and newest among equals → last in a tie),
+    // that count *is* its placement.
+    let placement = 0;
+    for (const game of data ?? []) {
+      if (game.hoop1_player_id && game.hoop1_score >= score) placement++;
+      if (game.hoop2_player_id && game.hoop2_score >= score) placement++;
+    }
+    return placement;
+  }
 }
 
 function toEntry(row: EmbeddedPlayer, score: number, playedAt: string): LeaderboardEntry {

@@ -54,9 +54,12 @@ export class SetupPage {
   protected readonly newPlayerName = signal('');
   protected readonly savingPlayer = signal(false);
 
-  /** Both hoops have a player assigned. */
+  /**
+   * At least one hoop has a player. A single player is enough to start — they
+   * play solo for a leaderboard spot and the empty hoop is ignored.
+   */
   protected readonly playersReady = computed(
-    () => !!this.hoop1Player() && !!this.hoop2Player(),
+    () => !!this.hoop1Player() || !!this.hoop2Player(),
   );
 
   /** The hoop sensors are reachable over MQTT. */
@@ -92,6 +95,16 @@ export class SetupPage {
     this.closePicker();
   }
 
+  /** Empty the hoop the picker is open for, e.g. to drop down to a solo game. */
+  protected clearCurrentHoop(): void {
+    if (this.pickerHoop() === 1) {
+      this.hoop1Player.set(null);
+    } else if (this.pickerHoop() === 2) {
+      this.hoop2Player.set(null);
+    }
+    this.closePicker();
+  }
+
   protected async addPlayer(): Promise<void> {
     const name = this.newPlayerName().trim();
     if (!name || this.savingPlayer()) return;
@@ -112,7 +125,7 @@ export class SetupPage {
   protected startGame(): void {
     const hoop1Player = this.hoop1Player();
     const hoop2Player = this.hoop2Player();
-    if (!hoop1Player || !hoop2Player || !this.sensorsReady()) return;
+    if ((!hoop1Player && !hoop2Player) || !this.sensorsReady()) return;
 
     this.game.configure({ mode: this.selectedMode(), hoop1Player, hoop2Player });
     void this.router.navigate(['/game']);

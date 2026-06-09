@@ -58,6 +58,16 @@ export class GameService {
   readonly hoop2Score = computed(() => this._hoop2ShotPoints().reduce((sum, p) => sum + p, 0));
 
   /**
+   * True when only one hoop has a player — a solo run for the leaderboard
+   * rather than a head-to-head. Shots on the unmanned hoop are ignored.
+   */
+  readonly isSinglePlayer = computed(() => {
+    const setup = this._setup();
+    if (!setup) return false;
+    return !setup.hoop1Player !== !setup.hoop2Player;
+  });
+
+  /**
    * True while a clutch-scoring mode is in its final stretch — the window in
    * which baskets are worth more. Drives the on-screen "Clutch Time" banner.
    */
@@ -69,6 +79,11 @@ export class GameService {
 
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private shotSub: Subscription | null = null;
+
+  // Resolves once the most recent finished game has been written to Supabase
+  // (or the attempt has settled). The results page awaits this before reading
+  // the leaderboard, so the just-played score is counted in the placement.
+  private persistPromise: Promise<void> = Promise.resolve();
 
   /** Store the setup chosen on the landing page. */
   configure(setup: GameSetup): void {
@@ -110,6 +125,8 @@ export class GameService {
    */
   recordShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
+    // Ignore shots on a hoop with no player (e.g. the empty hoop in a solo game).
+    if (!this.playerForHoop(hoop)) return;
     const points = this.currentShotValue();
     if (hoop === 1) {
       this._hoop1ShotPoints.update((p) => [...p, points]);
@@ -132,6 +149,13 @@ export class GameService {
    * Points a made shot is worth right now. Clutch modes award more once the
    * clock drops into their final window; otherwise it's the flat per-shot value.
    */
+  /** The player assigned to a hoop, or null if that hoop is unmanned. */
+  private playerForHoop(hoop: HoopId) {
+    const setup = this._setup();
+    if (!setup) return null;
+    return hoop === 1 ? setup.hoop1Player : setup.hoop2Player;
+  }
+
   private currentShotValue(): number {
     const mode = this._setup()?.mode;
     if (!mode) return 0;
@@ -181,8 +205,11 @@ export class GameService {
 
     const hoop1Score = this.hoop1Score();
     const hoop2Score = this.hoop2Score();
-    const isTie = hoop1Score === hoop2Score;
-    const winner = isTie
+    const isSinglePlayer = this.isSinglePlayer();
+
+    // A solo run has no opponent, so there's no winner and never a tie.
+    const isTie = !isSinglePlayer && hoop1Score === hoop2Score;
+    const winner = isSinglePlayer || isTie
       ? null
       : hoop1Score > hoop2Score
         ? setup.hoop1Player
@@ -198,11 +225,17 @@ export class GameService {
       hoop2Score,
       winner,
       isTie,
+      isSinglePlayer,
     };
 
     this._result.set(result);
     this._status.set('finished');
-    void this.persistResult(result);
+    this.persistPromise = this.persistResult(result);
+  }
+
+  /** Resolves once the most recently finished game's write has settled. */
+  whenPersisted(): Promise<void> {
+    return this.persistPromise;
   }
 
   /** Persist the finished game to Supabase. No-op when not configured. */
@@ -213,8 +246,8 @@ export class GameService {
     const { error } = await client.from('games').insert({
       mode: result.mode.id,
       duration_seconds: result.mode.durationSeconds,
-      hoop1_player_id: result.hoop1Player.id,
-      hoop2_player_id: result.hoop2Player.id,
+      hoop1_player_id: result.hoop1Player?.id ?? null,
+      hoop2_player_id: result.hoop2Player?.id ?? null,
       hoop1_score: result.hoop1Score,
       hoop2_score: result.hoop2Score,
       hoop1_shots: result.hoop1Shots,
