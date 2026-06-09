@@ -62,10 +62,17 @@
         </span>
         <div class="mt-1 h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
           <div
-            class="h-full bg-orange-400 transition-[width] duration-100 ease-linear"
+            class="h-full transition-[width] duration-100 ease-linear"
+            [class.bg-orange-400]="!game.isClutchActive()"
+            [class.bg-red-500]="game.isClutchActive()"
             [style.width.%]="(1 - game.progress()) * 100"
           ></div>
         </div>
+        @if (game.isClutchActive()) {
+          <span class="mt-1.5 animate-pulse text-xs font-black uppercase tracking-[0.2em] text-red-500">
+            🔥 Clutch Time · 3 pts
+          </span>
+        }
       </div>
     </div>
 

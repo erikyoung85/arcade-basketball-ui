@@ -25,8 +25,11 @@ export class GameService {
 
   private readonly _setup = signal<GameSetup | null>(null);
   private readonly _status = signal<GameStatus>('idle');
-  private readonly _hoop1Shots = signal(0);
-  private readonly _hoop2Shots = signal(0);
+  // The point value of each made shot, captured at the moment it was scored.
+  // Modes like Clutch Time award different points depending on the game clock,
+  // so we can't just multiply a count by a flat per-shot value after the fact.
+  private readonly _hoop1ShotPoints = signal<number[]>([]);
+  private readonly _hoop2ShotPoints = signal<number[]>([]);
   private readonly _countdownValue = signal(COUNTDOWN_SECONDS);
   private readonly _timeRemainingMs = signal(0);
   private readonly _result = signal<GameResult | null>(null);
@@ -34,11 +37,12 @@ export class GameService {
   /** Public read-only views of state. */
   readonly setup = this._setup.asReadonly();
   readonly status = this._status.asReadonly();
-  readonly hoop1Shots = this._hoop1Shots.asReadonly();
-  readonly hoop2Shots = this._hoop2Shots.asReadonly();
   readonly countdownValue = this._countdownValue.asReadonly();
   readonly timeRemainingMs = this._timeRemainingMs.asReadonly();
   readonly result = this._result.asReadonly();
+
+  readonly hoop1Shots = computed(() => this._hoop1ShotPoints().length);
+  readonly hoop2Shots = computed(() => this._hoop2ShotPoints().length);
 
   /** Whole seconds left on the game clock (rounded up for display). */
   readonly secondsRemaining = computed(() => Math.ceil(this._timeRemainingMs() / 1000));
@@ -50,12 +54,18 @@ export class GameService {
     return 1 - this._timeRemainingMs() / (total * 1000);
   });
 
-  readonly hoop1Score = computed(
-    () => this._hoop1Shots() * (this._setup()?.mode.pointsPerShot ?? 0),
-  );
-  readonly hoop2Score = computed(
-    () => this._hoop2Shots() * (this._setup()?.mode.pointsPerShot ?? 0),
-  );
+  readonly hoop1Score = computed(() => this._hoop1ShotPoints().reduce((sum, p) => sum + p, 0));
+  readonly hoop2Score = computed(() => this._hoop2ShotPoints().reduce((sum, p) => sum + p, 0));
+
+  /**
+   * True while a clutch-scoring mode is in its final stretch — the window in
+   * which baskets are worth more. Drives the on-screen "Clutch Time" banner.
+   */
+  readonly isClutchActive = computed(() => {
+    const clutch = this._setup()?.mode.clutch;
+    if (!clutch || this._status() !== 'running') return false;
+    return this.secondsRemaining() <= clutch.thresholdSeconds;
+  });
 
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private shotSub: Subscription | null = null;
@@ -64,8 +74,8 @@ export class GameService {
   configure(setup: GameSetup): void {
     this.clearTimer();
     this._setup.set(setup);
-    this._hoop1Shots.set(0);
-    this._hoop2Shots.set(0);
+    this._hoop1ShotPoints.set([]);
+    this._hoop2ShotPoints.set([]);
     this._result.set(null);
     this._status.set('idle');
     this._timeRemainingMs.set(setup.mode.durationSeconds * 1000);
@@ -100,10 +110,11 @@ export class GameService {
    */
   recordShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
+    const points = this.currentShotValue();
     if (hoop === 1) {
-      this._hoop1Shots.update((n) => n + 1);
+      this._hoop1ShotPoints.update((p) => [...p, points]);
     } else {
-      this._hoop2Shots.update((n) => n + 1);
+      this._hoop2ShotPoints.update((p) => [...p, points]);
     }
   }
 
@@ -111,10 +122,23 @@ export class GameService {
   undoShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
     if (hoop === 1) {
-      this._hoop1Shots.update((n) => Math.max(0, n - 1));
+      this._hoop1ShotPoints.update((p) => p.slice(0, -1));
     } else {
-      this._hoop2Shots.update((n) => Math.max(0, n - 1));
+      this._hoop2ShotPoints.update((p) => p.slice(0, -1));
     }
+  }
+
+  /**
+   * Points a made shot is worth right now. Clutch modes award more once the
+   * clock drops into their final window; otherwise it's the flat per-shot value.
+   */
+  private currentShotValue(): number {
+    const mode = this._setup()?.mode;
+    if (!mode) return 0;
+    if (mode.clutch && this.secondsRemaining() <= mode.clutch.thresholdSeconds) {
+      return mode.clutch.pointsPerShot;
+    }
+    return mode.pointsPerShot;
   }
 
   /** Reset everything back to idle (e.g. when leaving the game). */
@@ -123,8 +147,8 @@ export class GameService {
     this.stopListeningForShots();
     this._setup.set(null);
     this._status.set('idle');
-    this._hoop1Shots.set(0);
-    this._hoop2Shots.set(0);
+    this._hoop1ShotPoints.set([]);
+    this._hoop2ShotPoints.set([]);
     this._result.set(null);
     this._timeRemainingMs.set(0);
     this._countdownValue.set(COUNTDOWN_SECONDS);
@@ -168,8 +192,8 @@ export class GameService {
       mode: setup.mode,
       hoop1Player: setup.hoop1Player,
       hoop2Player: setup.hoop2Player,
-      hoop1Shots: this._hoop1Shots(),
-      hoop2Shots: this._hoop2Shots(),
+      hoop1Shots: this.hoop1Shots(),
+      hoop2Shots: this.hoop2Shots(),
       hoop1Score,
       hoop2Score,
       winner,

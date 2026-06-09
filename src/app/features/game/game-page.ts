@@ -61,6 +61,16 @@ export class GamePage {
       }
     });
 
+    // Announce "Clutch Time" once, the moment a clutch mode enters its final
+    // higher-scoring window.
+    let clutchAnnounced = false;
+    effect(() => {
+      if (this.game.isClutchActive() && !clutchAnnounced) {
+        clutchAnnounced = true;
+        this.sound.playClutchTime();
+      }
+    });
+
     // Announce the final "3 · 2 · 1" countdown, each number once.
     const counted = new Set<number>();
     effect(() => {

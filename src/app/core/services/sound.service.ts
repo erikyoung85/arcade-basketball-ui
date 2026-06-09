@@ -92,7 +92,28 @@ const END_COUNTDOWN = {
   volume: 1,
 };
 
-type SoundName = 'countdown' | 'backgroundMusic' | 'tenSecondWarning' | 'endCountdown';
+/**
+ * The "Clutch Time" announcement, played once when a clutch-scoring mode
+ * enters its final, higher-value window.
+ *
+ * Spoken with the browser's free text-to-speech by default. Set `src` to a
+ * file under `public/` or a public URL to play a recording instead.
+ */
+const CLUTCH_TIME = {
+  /** Spoken via the browser's free text-to-speech when `src` is empty. */
+  text: 'Clutch time!',
+  /** Optional audio file/URL to play INSTEAD of text-to-speech. */
+  src: '',
+  /** Volume, 0–1. */
+  volume: 1,
+};
+
+type SoundName =
+  | 'countdown'
+  | 'backgroundMusic'
+  | 'tenSecondWarning'
+  | 'endCountdown'
+  | 'clutchTime';
 
 /**
  * Plays the game's sound effects and background music.
@@ -178,6 +199,11 @@ export class SoundService {
   playTenSecondWarning(): void {
     const config = TEN_SECOND_WARNING;
     this.announce('tenSecondWarning', config.text, config.src, config.volume);
+  }
+
+  /** Announce the start of clutch time, when baskets become worth more. */
+  playClutchTime(): void {
+    this.announce('clutchTime', CLUTCH_TIME.text, CLUTCH_TIME.src, CLUTCH_TIME.volume);
   }
 
   /** Announce one number of the final 3·2·1 countdown. */
@@ -276,6 +302,9 @@ export class SoundService {
         break;
       case 'tenSecondWarning':
         stop = this.synthAlert(volume, [0, 0.22]); // two beeps
+        break;
+      case 'clutchTime':
+        stop = this.synthAlert(volume, [0, 0.18, 0.36]); // three rising-urgency beeps
         break;
       default: // endCountdown — a single beep per number
         stop = this.synthAlert(volume, [0]);
