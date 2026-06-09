@@ -8,7 +8,8 @@ import { InputText } from 'primeng/inputtext';
 import { PlayerService } from '../../core/services/player.service';
 import { GameService } from '../../core/services/game.service';
 import { MqttService } from '../../core/services/mqtt.service';
-import { DEFAULT_GAME_MODE, GAME_MODES, GameMode } from '../../core/models/game-mode.model';
+import { SetupStateService } from '../../core/services/setup-state.service';
+import { GAME_MODES, GameMode } from '../../core/models/game-mode.model';
 import { HoopId } from '../../core/models/game.model';
 import { Player } from '../../core/models/player.model';
 import { PlayerBadge } from '../../shared/player-badge';
@@ -31,12 +32,15 @@ export class SetupPage {
   protected readonly playerService = inject(PlayerService);
   private readonly game = inject(GameService);
   protected readonly mqtt = inject(MqttService);
+  private readonly setupState = inject(SetupStateService);
 
   protected readonly modes = GAME_MODES;
-  protected readonly selectedMode = signal<GameMode>(DEFAULT_GAME_MODE);
 
-  protected readonly hoop1Player = signal<Player | null>(null);
-  protected readonly hoop2Player = signal<Player | null>(null);
+  // Backed by SetupStateService (root-provided) so the operator's choices
+  // persist after playing a game and returning here, until a full page refresh.
+  protected readonly selectedMode = this.setupState.mode;
+  protected readonly hoop1Player = this.setupState.hoop1Player;
+  protected readonly hoop2Player = this.setupState.hoop2Player;
 
   constructor() {
     // Establish the broker link up front so the operator can see sensor
