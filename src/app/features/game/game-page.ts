@@ -32,7 +32,15 @@ export class GamePage {
       return;
     }
 
-    this.game.startCountdown();
+    // Download all the game's sounds first so a slow connection can't delay
+    // audio mid-game, showing a "Preparing…" screen meanwhile. Once they're
+    // buffered, kick off the normal 3·2·1 countdown. Guarded against the
+    // operator navigating away before the download finishes.
+    let left = false;
+    this.game.markPreparing();
+    void this.sound.preload().then(() => {
+      if (!left) this.game.startCountdown();
+    });
 
     // Drive audio off the game status. Reads only status(), so this runs once
     // per transition: countdown sound on the 3·2·1, music while playing.
@@ -81,8 +89,12 @@ export class GamePage {
       }
     });
 
-    // Stop any audio if the user navigates away mid-game.
-    inject(DestroyRef).onDestroy(() => this.sound.stopAll());
+    // Stop any audio if the user navigates away mid-game, and don't start the
+    // countdown if a still-pending preload resolves after we've left.
+    inject(DestroyRef).onDestroy(() => {
+      left = true;
+      this.sound.stopAll();
+    });
   }
 
   protected undoShot(hoop: HoopId): void {

@@ -97,9 +97,18 @@ export class GameService {
     this._countdownValue.set(COUNTDOWN_SECONDS);
   }
 
+  /**
+   * Enter the brief "preparing" state shown while the game's audio assets are
+   * downloaded. startCountdown() takes over once they're ready.
+   */
+  markPreparing(): void {
+    if (!this._setup() || this._status() !== 'idle') return;
+    this._status.set('preparing');
+  }
+
   /** Run the pre-game countdown, then start the game clock. */
   startCountdown(): void {
-    if (!this._setup() || this._status() !== 'idle') return;
+    if (!this._setup() || (this._status() !== 'idle' && this._status() !== 'preparing')) return;
     this._status.set('countdown');
     this._countdownValue.set(COUNTDOWN_SECONDS);
 

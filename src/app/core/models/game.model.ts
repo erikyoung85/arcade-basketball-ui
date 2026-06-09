@@ -18,8 +18,13 @@ export interface GameSetup {
   hoop2Player: Player | null;
 }
 
-/** Lifecycle of a locally-managed game. */
-export type GameStatus = 'idle' | 'countdown' | 'running' | 'finished';
+/**
+ * Lifecycle of a locally-managed game.
+ *
+ * `preparing` is a brief, pre-countdown state while the game's audio assets are
+ * downloaded, so a slow connection can't delay sounds once play begins.
+ */
+export type GameStatus = 'idle' | 'preparing' | 'countdown' | 'running' | 'finished';
 
 /** The final outcome, computed when the timer reaches zero. */
 export interface GameResult {

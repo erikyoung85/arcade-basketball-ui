@@ -116,6 +116,13 @@ type SoundName =
   | 'clutchTime';
 
 /**
+ * How long to wait for any single audio file to buffer during preload before
+ * giving up on it. A missing or slow file shouldn't hold the game hostage — the
+ * synthesized fallbacks cover anything that isn't ready in time.
+ */
+const PRELOAD_TIMEOUT_MS = 15_000;
+
+/**
  * Plays the game's sound effects and background music.
  *
  * Sounds play via a plain `<audio>` element; if a file is missing (or its
@@ -134,6 +141,57 @@ export class SoundService {
   private audioContext: AudioContext | null = null;
   /** Active synth nodes per sound, so a looping synth can be stopped. */
   private readonly synthStops = new Map<SoundName, () => void>();
+
+  /**
+   * Download every audio file the game will need so playback isn't delayed by a
+   * slow connection mid-game. Resolves once each file is buffered enough to play
+   * through (or has errored/timed out — the synth fallbacks cover failures, so a
+   * missing or slow file never blocks the game forever).
+   *
+   * Files are fetched into the browser's HTTP cache here; the `<audio>` elements
+   * created later when sounds actually play then load instantly from cache.
+   * Text-to-speech announcements need no preloading and are skipped.
+   */
+  async preload(): Promise<void> {
+    await Promise.all(this.fileSources().map((src) => this.preloadOne(src)));
+  }
+
+  /** Distinct local/remote audio file sources the game uses (TTS excluded). */
+  private fileSources(): string[] {
+    const srcs = [
+      SOUND_CONFIG.countdown.src,
+      ...BACKGROUND_MUSIC.map((track) => track.src),
+      TEN_SECOND_WARNING.src,
+      CLUTCH_TIME.src,
+      ...Object.values(END_COUNTDOWN.src),
+    ];
+    return [...new Set(srcs.filter((src) => !!src))];
+  }
+
+  /** Buffer one audio file, resolving when it's ready or has given up. */
+  private preloadOne(src: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const audio = new Audio();
+      audio.preload = 'auto';
+
+      let settled = false;
+      const done = (): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+
+      // `canplaythrough` fires once enough is buffered to play to the end without
+      // stalling — i.e. the file is, for our purposes, fully loaded.
+      audio.addEventListener('canplaythrough', done, { once: true });
+      audio.addEventListener('error', done, { once: true });
+      const timer = setTimeout(done, PRELOAD_TIMEOUT_MS);
+
+      audio.src = this.resolveSrc(src);
+      audio.load();
+    });
+  }
 
   /** Play the pre-game countdown sound once. */
   playCountdown(): void {

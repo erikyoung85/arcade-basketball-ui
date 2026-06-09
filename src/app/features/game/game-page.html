@@ -79,6 +79,15 @@
       </div>
     </div>
 
+    <!-- Preparing overlay — shown while the game's sounds are downloaded so
+         audio isn't delayed mid-game on a slow connection. -->
+    @if (game.status() === 'preparing') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-slate-950/90 backdrop-blur-sm">
+        <i class="pi pi-spin pi-spinner text-6xl text-orange-400"></i>
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Preparing…</span>
+      </div>
+    }
+
     <!-- Pre-game countdown overlay -->
     @if (game.status() === 'countdown') {
       <div class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm">
