@@ -56,7 +56,7 @@ const SOUND_CONFIG = {
  * synthesized loop plays instead.
  */
 const BACKGROUND_MUSIC: BackgroundTrack[] = [
-  { src: 'sounds/music/jump-up-super-star.mp3', volume: 0.35, startSeconds: 30 },
+  { src: 'sounds/music/jump-up-super-star.m4a', volume: 0.35, startSeconds: 0 },
 ];
 
 /**
