@@ -146,6 +146,16 @@ export class SoundService {
    */
   private readonly cache = new Map<string, string>();
 
+  /**
+   * Fully-decoded, ready-to-play `<audio>` elements keyed by their configured
+   * `src`. A blob in memory (see `cache`) still has to be decoded by an audio
+   * element before `play()` will start, and that decode is what delayed the
+   * countdown on a new game. Preloading these elements to `canplaythrough` and
+   * reusing them means playback begins the instant it's requested. Like the
+   * blob cache, this is app-wide and outlives any single game.
+   */
+  private readonly prepared = new Map<string, HTMLAudioElement>();
+
   /** Lazily-created Web Audio context for the synthesized fallbacks. */
   private audioContext: AudioContext | null = null;
   /** Active synth nodes per sound, so a looping synth can be stopped. */
@@ -174,6 +184,11 @@ export class SoundService {
    */
   async preload(): Promise<void> {
     await Promise.all(this.fileSources().map((src) => this.cacheOne(src)));
+    // The 3·2·1 countdown is the first sound a game plays — the instant the
+    // countdown starts — so beyond downloading its bytes, decode it now into a
+    // ready-to-play element so play() starts immediately rather than waiting on
+    // a decode mid-game. (The blob is already in memory from cacheOne above.)
+    await this.prepareOne(SOUND_CONFIG.countdown.src);
   }
 
   /** Distinct local/remote audio file sources the game uses (TTS excluded). */
@@ -214,12 +229,44 @@ export class SoundService {
   }
 
   /**
-   * A ready-to-play <audio> for a configured `src`: backed by the in-memory
-   * blob when it was preloaded (instant, no network), otherwise pointed at the
-   * resolved network URL as a last resort.
+   * Decode a (already-downloaded) source into an `<audio>` element that's fully
+   * buffered and ready to play with no further loading, then remember it in
+   * `prepared` for reuse. Resolves once the element reports it can play through
+   * — or on error/timeout, in which case nothing is cached and the caller's
+   * fallbacks (network URL, then synth) cover it. This is what removes the
+   * decode-on-first-play delay: `play()` on the prepared element starts at once.
+   */
+  private async prepareOne(src: string): Promise<void> {
+    if (!src || this.prepared.has(src)) return;
+
+    const audio = this.audioFor(src);
+    audio.preload = 'auto';
+    const ready = await new Promise<boolean>((resolve) => {
+      const finish = (ok: boolean): void => {
+        clearTimeout(timer);
+        audio.removeEventListener('canplaythrough', onReady);
+        audio.removeEventListener('error', onError);
+        resolve(ok);
+      };
+      const onReady = (): void => finish(true);
+      const onError = (): void => finish(false);
+      const timer = setTimeout(() => finish(false), PRELOAD_TIMEOUT_MS);
+      if (audio.readyState >= 4 /* HAVE_ENOUGH_DATA */) return finish(true);
+      audio.addEventListener('canplaythrough', onReady, { once: true });
+      audio.addEventListener('error', onError, { once: true });
+      audio.load();
+    });
+
+    if (ready) this.prepared.set(src, audio);
+  }
+
+  /**
+   * A ready-to-play <audio> for a configured `src`: the element prepared (fully
+   * decoded) during preload when available (instant), otherwise one backed by
+   * the in-memory blob, otherwise pointed at the resolved network URL.
    */
   private audioFor(src: string): HTMLAudioElement {
-    return new Audio(this.cache.get(src) ?? this.resolveSrc(src));
+    return this.prepared.get(src) ?? new Audio(this.cache.get(src) ?? this.resolveSrc(src));
   }
 
   /** Play the pre-game countdown sound once. */
@@ -231,10 +278,13 @@ export class SoundService {
     }
     this.stop('countdown');
     const audio = this.audioFor(config.src);
+    // The prepared element is reused across games, so rewind it and use a
+    // single (overwriting) error handler rather than stacking one per game.
+    audio.currentTime = 0;
     audio.volume = config.volume;
     audio.loop = config.loop;
     this.elements.set('countdown', audio);
-    audio.addEventListener('error', () => this.fallbackToSynth('countdown', config.volume));
+    audio.onerror = () => this.fallbackToSynth('countdown', config.volume);
     audio.play().catch(() => this.fallbackToSynth('countdown', config.volume));
   }
 
