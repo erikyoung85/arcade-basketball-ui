@@ -142,6 +142,23 @@ export class SoundService {
   /** Active synth nodes per sound, so a looping synth can be stopped. */
   private readonly synthStops = new Map<SoundName, () => void>();
 
+  constructor() {
+    // Force initialization of speechSynthesis
+    this.initSpeechSynthesis();
+  }
+
+  /** Force initialization of speech synthesis for mobile safari browsers */
+  private initSpeechSynthesis(): void {
+    const synth = window.speechSynthesis;
+
+    synth.speak(new SpeechSynthesisUtterance(' '));
+    synth.cancel();
+
+    setTimeout(() => {
+      console.log(synth.getVoices());
+    }, 1000);
+  }
+
   /**
    * Download every audio file the game will need so playback isn't delayed by a
    * slow connection mid-game. Resolves once each file is buffered enough to play
