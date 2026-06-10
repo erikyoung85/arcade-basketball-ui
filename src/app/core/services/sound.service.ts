@@ -151,13 +151,8 @@ export class SoundService {
   /** Active synth nodes per sound, so a looping synth can be stopped. */
   private readonly synthStops = new Map<SoundName, () => void>();
 
-  constructor() {
-    // Force initialization of speechSynthesis
-    this.initSpeechSynthesis();
-  }
-
   /** Force initialization of speech synthesis for mobile safari browsers */
-  private initSpeechSynthesis(): void {
+  initSpeechSynthesis(): void {
     const synth = window.speechSynthesis;
 
     console.log(synth.getVoices());
