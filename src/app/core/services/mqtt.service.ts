@@ -3,17 +3,24 @@ import mqtt, { MqttClient } from 'mqtt';
 import { Subject } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { DebugShotEvent, RawDebugShotPayload } from '../models/debug-shot-event.model';
 import { hoopFromRaw, RawShotPayload, ShotEvent } from '../models/shot-event.model';
 
 /** Topic the shot-sensor publishes made-shot events on. */
 const SHOTS_TOPIC = 'basketball/shots';
-/** Topic the sensor replies to `getStatus` commands on (`{ uptime: number }`). */
+/** Topic the sensor publishes per-shot diagnostics on while in debug mode. */
+const DEBUG_SHOTS_TOPIC = 'basketball/debug/shots';
+/** Topic the sensor replies to `getStatus` commands on (`{ uptime, mode }`). */
 const RESPONSE_TOPIC = 'basketball/response';
 /** Topic we publish commands (e.g. `getStatus`) to the sensor on. */
 const CMD_TOPIC = 'basketball/cmd';
 
 /** Command payload that asks the sensor to report its health. */
 const GET_STATUS_CMD = JSON.stringify({ method: 'getStatus', args: {} });
+/** Command payload that switches the sensor into debug (test) mode. */
+const ENTER_DEBUG_CMD = JSON.stringify({ method: 'enterDebugMode', args: {} });
+/** Command payload that switches the sensor back into production mode. */
+const ENTER_PRODUCTION_CMD = JSON.stringify({ method: 'enterProductionMode', args: {} });
 
 /** How often we ping the sensor for a health response while connected. */
 const HEALTH_POLL_MS = 15_000;
@@ -32,6 +39,14 @@ export type MqttStatus = 'disconnected' | 'connecting' | 'connected' | 'error' |
 
 /** Tri-state for the sensor health-check, independent of the broker link. */
 type SensorState = 'unknown' | 'online' | 'offline';
+
+/**
+ * Operating mode the sensor reports in its health reply. `debug` puts it into
+ * test mode (where it streams per-shot diagnostics on `basketball/debug/shots`);
+ * `production` is normal play. `unknown` means we haven't heard a mode yet (or
+ * an older firmware that doesn't report one).
+ */
+export type SensorMode = 'debug' | 'production' | 'unknown';
 
 /**
  * Owns the connection to the local MQTT broker and turns raw
@@ -58,6 +73,7 @@ export class MqttService {
     'disconnected',
   );
   private readonly _sensorState = signal<SensorState>('unknown');
+  private readonly _mode = signal<SensorMode>('unknown');
 
   /** Combined broker + sensor health, for status indicators and game gating. */
   readonly status = computed<MqttStatus>(() => {
@@ -73,8 +89,14 @@ export class MqttService {
     }
   });
 
+  /** The sensor's last-reported operating mode (`debug` / `production`). */
+  readonly mode = this._mode.asReadonly();
+
   /** Emits one event per valid `basketball/shots` message received. */
   readonly shots$ = new Subject<ShotEvent>();
+
+  /** Emits one event per valid `basketball/debug/shots` message (test mode). */
+  readonly debugShots$ = new Subject<DebugShotEvent>();
 
   /** Open a connection to the broker and subscribe to the sensor topics. */
   connect(): void {
@@ -86,7 +108,7 @@ export class MqttService {
 
     client.on('connect', () => {
       this._brokerStatus.set('connected');
-      client.subscribe([SHOTS_TOPIC, RESPONSE_TOPIC], (err) => {
+      client.subscribe([SHOTS_TOPIC, DEBUG_SHOTS_TOPIC, RESPONSE_TOPIC], (err) => {
         if (err) {
           console.error('MQTT: failed to subscribe to sensor topics:', err.message);
           this._brokerStatus.set('error');
@@ -100,8 +122,15 @@ export class MqttService {
       if (topic === SHOTS_TOPIC) {
         const event = this.parseShot(payload);
         if (event) this.shots$.next(event);
+      } else if (topic === DEBUG_SHOTS_TOPIC) {
+        const event = this.parseDebugShot(payload);
+        if (event) this.debugShots$.next(event);
       } else if (topic === RESPONSE_TOPIC) {
-        if (this.isHealthReply(payload)) this.markSensorOnline();
+        const reply = this.parseHealthReply(payload);
+        if (reply) {
+          this.markSensorOnline();
+          this._mode.set(reply.mode);
+        }
       }
     });
 
@@ -121,6 +150,16 @@ export class MqttService {
       this._brokerStatus.set('disconnected');
       this.stopHealthChecks();
     });
+  }
+
+  /** Ask the sensor to switch into debug (test) mode. */
+  enterDebugMode(): void {
+    this.client?.publish(CMD_TOPIC, ENTER_DEBUG_CMD);
+  }
+
+  /** Ask the sensor to switch back into production mode. */
+  enterProductionMode(): void {
+    this.client?.publish(CMD_TOPIC, ENTER_PRODUCTION_CMD);
   }
 
   /** Drop any existing connection and open a fresh one to the broker. */
@@ -152,6 +191,7 @@ export class MqttService {
     this.clearPollTimer();
     this.clearStaleTimer();
     this._sensorState.set('unknown');
+    this._mode.set('unknown');
   }
 
   /**
@@ -204,15 +244,45 @@ export class MqttService {
     }
   }
 
-  /** True when the payload is a valid `{ uptime: number }` health reply. */
-  private isHealthReply(payload: Uint8Array): boolean {
+  /**
+   * Parse a health reply, returning its operating mode, or null when the
+   * payload isn't a valid `{ uptime: number }` reply. A reply without a (valid)
+   * `mode` field still counts as healthy and reports `'unknown'`, so older
+   * firmware that doesn't send a mode keeps the sensor marked online.
+   */
+  private parseHealthReply(payload: Uint8Array): { mode: SensorMode } | null {
     try {
-      const reply = JSON.parse(payload.toString()) as { uptime?: unknown };
-      return typeof reply.uptime === 'number';
+      const reply = JSON.parse(payload.toString()) as { uptime?: unknown; mode?: unknown };
+      if (typeof reply.uptime !== 'number') return null;
+      const mode: SensorMode =
+        reply.mode === 'debug' ? 'debug' : reply.mode === 'production' ? 'production' : 'unknown';
+      return { mode };
     } catch {
       console.warn('MQTT: ignoring non-JSON sensor response');
-      return false;
+      return null;
     }
+  }
+
+  /** Parse + validate a raw debug-shot payload, returning null if malformed. */
+  private parseDebugShot(payload: Uint8Array): DebugShotEvent | null {
+    let raw: Partial<RawDebugShotPayload>;
+    try {
+      raw = JSON.parse(payload.toString());
+    } catch {
+      console.warn('MQTT: ignoring non-JSON debug shot payload', payload.toString());
+      return null;
+    }
+
+    if (
+      typeof raw.hoop !== 'string' ||
+      typeof raw.isShotMade !== 'boolean' ||
+      !Array.isArray(raw.eventLog) ||
+      !raw.eventLog.every((line) => typeof line === 'string')
+    ) {
+      console.warn('MQTT: ignoring malformed debug shot payload:', raw);
+      return null;
+    }
+    return { hoop: raw.hoop, isShotMade: raw.isShotMade, eventLog: raw.eventLog };
   }
 
   /** Parse + validate a raw shot payload, returning null for malformed messages. */

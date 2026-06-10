@@ -33,5 +33,10 @@ export const routes: Routes = [
       ),
     title: 'Back to Back · Results',
   },
+  {
+    path: 'test',
+    loadComponent: () => import('./features/test/test-page').then((m) => m.TestPage),
+    title: 'Test Mode',
+  },
   { path: '**', redirectTo: '' },
 ];

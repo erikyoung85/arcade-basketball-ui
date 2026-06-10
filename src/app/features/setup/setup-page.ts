@@ -163,4 +163,10 @@ export class SetupPage {
     this.game.configure({ mode, hoop1Player, hoop2Player });
     void this.router.navigate(['/game']);
   }
+
+  /** Put the sensor into debug mode and open the test screen. */
+  protected openTestMode(): void {
+    this.mqtt.enterDebugMode();
+    void this.router.navigate(['/test']);
+  }
 }

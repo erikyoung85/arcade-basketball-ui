@@ -1,0 +1,78 @@
+<div class="min-h-dvh w-full bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white">
+  <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-8">
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <div class="mb-4 flex justify-center">
+        <app-mqtt-status-indicator />
+      </div>
+      <h1 class="text-4xl font-black tracking-tight sm:text-5xl">
+        🛠️ Test <span class="text-orange-400">Mode</span>
+      </h1>
+      <p class="mt-2 text-lg text-slate-400">
+        The sensor is in debug mode. Take a shot to see its diagnostics.
+      </p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <p-button
+          label="Back to Main"
+          icon="pi pi-arrow-left"
+          severity="secondary"
+          (onClick)="exitTestMode()"
+        />
+        @if (shots().length) {
+          <p-button
+            label="Clear Log"
+            icon="pi pi-trash"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="clearLog()"
+          />
+        }
+      </div>
+    </header>
+
+    <!-- Shot events -->
+    <section class="flex-1">
+      @if (shots().length === 0) {
+        <div
+          class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-700 py-16 text-center text-slate-500"
+        >
+          <i class="pi pi-hourglass mb-3 text-3xl"></i>
+          <p class="text-lg">Waiting for a shot…</p>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-4">
+          @for (shot of shots(); track shot.id) {
+            <article
+              class="rounded-2xl border-2 p-5"
+              [class.border-green-500]="shot.isShotMade"
+              [class.border-red-500]="!shot.isShotMade"
+              [style.background-color]="
+                shot.isShotMade ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)'
+              "
+            >
+              <div class="mb-3 flex items-center gap-2 text-xl font-bold">
+                @if (shot.isShotMade) {
+                  <i class="pi pi-check-circle text-green-400"></i>
+                  <span class="text-green-300">Made</span>
+                } @else {
+                  <i class="pi pi-times-circle text-red-400"></i>
+                  <span class="text-red-300">Missed</span>
+                }
+                <span class="ml-auto text-sm font-semibold uppercase tracking-wide text-slate-400">
+                  {{ shot.hoop }}
+                </span>
+              </div>
+              <ul
+                class="list-disc space-y-1 overflow-x-auto rounded-lg bg-slate-950/60 p-4 pl-8 font-mono text-sm text-slate-300"
+              >
+                @for (line of shot.eventLog; track $index) {
+                  <li class="whitespace-pre-wrap break-words">{{ line }}</li>
+                }
+              </ul>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>
