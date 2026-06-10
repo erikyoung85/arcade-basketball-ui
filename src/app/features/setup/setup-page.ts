@@ -7,14 +7,16 @@ import { InputText } from 'primeng/inputtext';
 
 import { PlayerService } from '../../core/services/player.service';
 import { GameService } from '../../core/services/game.service';
+import { BackToBackService } from '../../core/services/back-to-back.service';
 import { MqttService } from '../../core/services/mqtt.service';
 import { SetupStateService } from '../../core/services/setup-state.service';
-import { GAME_MODES, GameMode } from '../../core/models/game-mode.model';
+import { GAME_MODES, isBackToBack } from '../../core/models/game-mode.model';
 import { HoopId } from '../../core/models/game.model';
 import { Player } from '../../core/models/player.model';
 import { PlayerBadge } from '../../shared/player-badge';
 import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
 import { Leaderboard } from '../leaderboard/leaderboard';
+import { TeamLeaderboard } from '../leaderboard/team-leaderboard';
 
 /**
  * Landing page. The operator picks a player for each hoop and a game mode,
@@ -23,7 +25,16 @@ import { Leaderboard } from '../leaderboard/leaderboard';
  */
 @Component({
   selector: 'app-setup-page',
-  imports: [FormsModule, Button, Dialog, InputText, PlayerBadge, MqttStatusIndicator, Leaderboard],
+  imports: [
+    FormsModule,
+    Button,
+    Dialog,
+    InputText,
+    PlayerBadge,
+    MqttStatusIndicator,
+    Leaderboard,
+    TeamLeaderboard,
+  ],
   templateUrl: './setup-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -31,6 +42,7 @@ export class SetupPage {
   private readonly router = inject(Router);
   protected readonly playerService = inject(PlayerService);
   private readonly game = inject(GameService);
+  private readonly backToBack = inject(BackToBackService);
   protected readonly mqtt = inject(MqttService);
   private readonly setupState = inject(SetupStateService);
 
@@ -54,13 +66,26 @@ export class SetupPage {
   protected readonly newPlayerName = signal('');
   protected readonly savingPlayer = signal(false);
 
-  /**
-   * At least one hoop has a player. A single player is enough to start — they
-   * play solo for a leaderboard spot and the empty hoop is ignored.
-   */
-  protected readonly playersReady = computed(
-    () => !!this.hoop1Player() || !!this.hoop2Player(),
+  /** True when the selected mode is the head-to-head "back to back vs" mode. */
+  protected readonly isVersusMode = computed(
+    () => !!this.selectedMode().backToBack && !this.selectedMode().backToBack!.team,
   );
+
+  /** True when the selected mode is the co-operative "back to back team" mode. */
+  protected readonly isTeamMode = computed(() => !!this.selectedMode().backToBack?.team);
+
+  /** Whether the selected mode must be started with both hoops filled. */
+  protected readonly requiresTwoPlayers = computed(() => !!this.selectedMode().requiresTwoPlayers);
+
+  /**
+   * Enough players are chosen to start. Versus needs both hoops filled; every
+   * other mode allows a single player (a solo run / solo team).
+   */
+  protected readonly playersReady = computed(() => {
+    const both = !!this.hoop1Player() && !!this.hoop2Player();
+    if (this.requiresTwoPlayers()) return both;
+    return both || !!this.hoop1Player() || !!this.hoop2Player();
+  });
 
   /** The hoop sensors are reachable over MQTT. */
   protected readonly sensorsReady = computed(() => this.mqtt.status() === 'connected');
@@ -125,9 +150,17 @@ export class SetupPage {
   protected startGame(): void {
     const hoop1Player = this.hoop1Player();
     const hoop2Player = this.hoop2Player();
-    if ((!hoop1Player && !hoop2Player) || !this.sensorsReady()) return;
+    const mode = this.selectedMode();
+    if (!this.playersReady() || !this.sensorsReady()) return;
 
-    this.game.configure({ mode: this.selectedMode(), hoop1Player, hoop2Player });
+    // Turn-based "back to back" modes run on their own engine + screens.
+    if (isBackToBack(mode)) {
+      this.backToBack.configure({ mode, hoop1Player, hoop2Player });
+      void this.router.navigate(['/back-to-back']);
+      return;
+    }
+
+    this.game.configure({ mode, hoop1Player, hoop2Player });
     void this.router.navigate(['/game']);
   }
 }

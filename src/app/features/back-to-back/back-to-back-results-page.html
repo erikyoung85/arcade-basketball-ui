@@ -1,0 +1,135 @@
+@if (result(); as r) {
+  <div class="min-h-dvh w-full bg-gradient-to-b from-slate-900 to-slate-950 text-white">
+    <div class="mx-auto flex min-h-dvh max-w-4xl flex-col items-center px-6 py-10">
+      <!-- Headline -->
+      <div class="mb-8 text-center">
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">
+          {{ r.mode.name }} · Final
+        </span>
+        <h1 class="mt-2 flex items-center justify-center gap-3 text-5xl font-black sm:text-6xl">
+          <i class="pi pi-trophy text-yellow-400"></i>
+          {{ headline() }}
+        </h1>
+      </div>
+
+      @if (r.isTeam) {
+        <!-- Team result: rounds survived + leaderboard placement -->
+        <div class="flex w-full flex-1 flex-col items-center justify-center gap-6 rounded-3xl border-2 border-slate-700 p-8">
+          <div class="flex -space-x-3">
+            @if (r.hoop1Player) {
+              <app-player-badge [player]="r.hoop1Player" [size]="96" />
+            }
+            @if (r.hoop2Player) {
+              <app-player-badge [player]="r.hoop2Player" [size]="96" />
+            }
+          </div>
+          <span class="text-2xl font-bold">
+            @if (r.hoop1Player && r.hoop2Player) {
+              {{ r.hoop1Player.name }} &amp; {{ r.hoop2Player.name }}
+            } @else {
+              {{ (r.hoop1Player ?? r.hoop2Player)?.name }}
+            }
+          </span>
+
+          <div class="text-center leading-none">
+            <span class="block text-8xl font-black tabular-nums">{{ r.roundsSurvived }}</span>
+            <span class="text-base uppercase tracking-widest text-slate-400">
+              {{ r.roundsSurvived === 1 ? 'round survived' : 'rounds survived' }}
+            </span>
+          </div>
+
+          <!-- Team strikes -->
+          <div class="flex items-center gap-2">
+            @for (used of teamStrikePips(); track $index) {
+              <span
+                class="flex h-9 w-9 items-center justify-center rounded-full border-2 text-lg font-black"
+                [class.border-red-500]="used"
+                [class.bg-red-500]="used"
+                [class.text-white]="used"
+                [class.border-slate-700]="!used"
+                [class.text-slate-700]="!used"
+              >✕</span>
+            }
+          </div>
+
+          <!-- Leaderboard placement -->
+          <div class="flex min-h-20 flex-col items-center text-center">
+            @if (placement.isLoading()) {
+              <span class="text-sm text-slate-400">Checking the leaderboard…</span>
+            } @else if (placement.value(); as place) {
+              @if (medal(place); as medalEmoji) {
+                <span class="text-5xl leading-none">{{ medalEmoji }}</span>
+                <span class="mt-1 text-xl font-black">{{ ordinal(place) }} place</span>
+              } @else {
+                <span class="text-2xl font-black">{{ ordinal(place) }} place</span>
+              }
+              <span class="mt-0.5 text-xs text-slate-400">Back to Back Team leaderboard</span>
+            }
+          </div>
+        </div>
+      } @else {
+        <!-- Versus result: each player's strikes, winner highlighted -->
+        <div class="grid w-full flex-1 grid-cols-2 gap-4 sm:gap-6">
+          @for (hoop of hoops; track hoop) {
+            @let isHoop1 = hoop === 1;
+            @let player = isHoop1 ? r.hoop1Player : r.hoop2Player;
+            @let isWinner = r.winner?.id === player?.id;
+            @if (player) {
+              <div
+                class="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 p-8 transition"
+                [class.border-yellow-400]="isWinner"
+                [class.border-slate-700]="!isWinner"
+                [style.background-color]="isWinner ? 'rgba(250,204,21,0.1)' : 'transparent'"
+              >
+                @if (isWinner) {
+                  <span class="rounded-full bg-yellow-400 px-4 py-1 text-sm font-bold text-slate-900">
+                    WINNER
+                  </span>
+                } @else {
+                  <span class="rounded-full bg-red-500 px-4 py-1 text-sm font-bold text-white">
+                    OUT
+                  </span>
+                }
+                <app-player-badge [player]="player" [size]="96" />
+                <span class="text-3xl font-bold">{{ player.name }}</span>
+                <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Hoop {{ hoop }}</span>
+                <div class="mt-2 flex items-center gap-2">
+                  @for (used of strikePips(hoop); track $index) {
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-full border-2 text-lg font-black"
+                      [class.border-red-500]="used"
+                      [class.bg-red-500]="used"
+                      [class.text-white]="used"
+                      [class.border-slate-700]="!used"
+                      [class.text-slate-700]="!used"
+                    >✕</span>
+                  }
+                </div>
+                <span class="text-sm text-slate-400">
+                  {{ (isHoop1 ? r.hoop1Strikes : r.hoop2Strikes) }} of {{ r.mode.backToBack?.maxStrikes }} strikes
+                </span>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Actions -->
+      <div class="mt-10 flex w-full flex-col gap-4 sm:flex-row">
+        <p-button
+          label="New Game"
+          icon="pi pi-home"
+          severity="secondary"
+          (onClick)="newGame()"
+          styleClass="w-full justify-center !py-4 !text-xl"
+        />
+        <p-button
+          label="Play Again"
+          icon="pi pi-replay"
+          (onClick)="playAgain()"
+          styleClass="w-full justify-center !py-4 !text-xl !font-bold"
+        />
+      </div>
+    </div>
+  </div>
+}

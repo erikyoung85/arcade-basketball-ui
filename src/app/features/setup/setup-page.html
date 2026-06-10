@@ -26,8 +26,19 @@
               selectedMode().id === mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'
             "
           >
-            <div class="flex items-center justify-between">
-              <span class="text-xl font-bold">{{ mode.name }}</span>
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex items-center gap-2 text-xl font-bold">
+                {{ mode.name }}
+                @if (mode.requiresTwoPlayers) {
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full bg-orange-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-300"
+                    title="Requires 2 players"
+                  >
+                    <i class="pi pi-users text-xs"></i>
+                    2P only
+                  </span>
+                }
+              </span>
               @if (selectedMode().id === mode.id) {
                 <i class="pi pi-check-circle text-2xl text-orange-400"></i>
               }
@@ -43,7 +54,13 @@
       <div class="mb-3 flex items-baseline justify-between gap-3">
         <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
         <span class="text-xs text-slate-500">
-          Pick two to compete, or just one to play solo for the leaderboard.
+          @if (isVersusMode()) {
+            Back to Back VS needs two players.
+          } @else if (isTeamMode()) {
+            Back to Back Team needs two players.
+          } @else {
+            Pick two to compete, or just one to play solo for the leaderboard.
+          }
         </span>
       </div>
       <div class="grid gap-4 grid-cols-2">
@@ -70,9 +87,17 @@
       </div>
     </section>
 
-    <!-- Leaderboard -->
+    <!-- Leaderboard. Team mode has its own duo board; VS has no leaderboard. -->
     <div class="mb-8 flex-1">
-      <app-leaderboard [mode]="selectedMode()" />
+      @if (isTeamMode()) {
+        <app-team-leaderboard />
+      } @else if (isVersusMode()) {
+        <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
+          Head-to-head — first to 3 strikes loses. No leaderboard for this mode.
+        </p>
+      } @else {
+        <app-leaderboard [mode]="selectedMode()" />
+      }
     </div>
 
     <!-- Start -->

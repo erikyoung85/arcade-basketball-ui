@@ -56,7 +56,7 @@ const SOUND_CONFIG = {
  * synthesized loop plays instead.
  */
 const BACKGROUND_MUSIC: BackgroundTrack[] = [
-  { src: 'sounds/music/jump-up-super-star.m4a', volume: 0.35, startSeconds: 0 },
+  { src: 'sounds/music/jump-up-super-star.m4a', volume: 0.15, startSeconds: 0 },
 ];
 
 /**
@@ -108,12 +108,27 @@ const CLUTCH_TIME = {
   volume: 1,
 };
 
+/**
+ * Spoken cues for the turn-based "back to back" modes. Each is spoken with the
+ * browser's free text-to-speech by default; set `src` to a file under
+ * `public/` (or a public URL) to play a recording instead. `turn` has no fixed
+ * text — the active player's name is spoken at call time.
+ */
+const SHOT_MADE = { text: 'Score!', src: '', volume: 1 };
+const SHOT_MISSED = { text: 'Miss!', src: '', volume: 1 };
+const STRIKE = { text: 'Strike!', src: '', volume: 1 };
+const TURN_CUE = { src: '', volume: 1 };
+
 type SoundName =
   | 'countdown'
   | 'backgroundMusic'
   | 'tenSecondWarning'
   | 'endCountdown'
-  | 'clutchTime';
+  | 'clutchTime'
+  | 'turn'
+  | 'shotMade'
+  | 'shotMissed'
+  | 'strike';
 
 /**
  * How long to wait for any single audio file to buffer during preload before
@@ -346,6 +361,38 @@ export class SoundService {
   /** Announce one number of the final 3·2·1 countdown. */
   playEndCountdown(n: number): void {
     this.announce('endCountdown', String(n), END_COUNTDOWN.src[n] ?? '', END_COUNTDOWN.volume);
+  }
+
+  /** Stop the (looping or one-shot) pre-game / shot-clock countdown sound. */
+  stopCountdown(): void {
+    this.stop('countdown');
+  }
+
+  /**
+   * Announce whose turn it is in a back-to-back game (speaks the player's name).
+   * When `practice` is true the round has already been decided by a strike, so
+   * the cue makes clear this shot is just for practice.
+   */
+  playTurnCue(playerName: string, practice = false): void {
+    const text = practice
+      ? `${playerName}, you're up. This one is just a practice shot.`
+      : `${playerName}, you're up`;
+    this.announce('turn', text, TURN_CUE.src, TURN_CUE.volume);
+  }
+
+  /** Announce a made shot in a back-to-back game. */
+  playShotMade(): void {
+    this.announce('shotMade', SHOT_MADE.text, SHOT_MADE.src, SHOT_MADE.volume);
+  }
+
+  /** Announce a missed shot in a back-to-back game. */
+  playShotMissed(): void {
+    this.announce('shotMissed', SHOT_MISSED.text, SHOT_MISSED.src, SHOT_MISSED.volume);
+  }
+
+  /** Announce a strike in a back-to-back game. */
+  playStrike(): void {
+    this.announce('strike', STRIKE.text, STRIKE.src, STRIKE.volume);
   }
 
   /**

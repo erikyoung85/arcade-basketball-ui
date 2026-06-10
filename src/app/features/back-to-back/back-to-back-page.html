@@ -1,0 +1,147 @@
+@if (game.setup(); as setup) {
+  <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
+    <!-- Hoop turn panels. A solo team game shows just the one manned hoop. -->
+    <div class="grid flex-1" [class.grid-cols-2]="!game.isSinglePlayer()">
+      @for (hoop of hoops; track hoop) {
+        @let isHoop1 = hoop === 1;
+        @let player = isHoop1 ? setup.hoop1Player : setup.hoop2Player;
+        @let isActive = game.activeHoop() === hoop;
+        @if (player) {
+          <div
+            class="relative flex select-none flex-col items-center justify-center gap-5 transition duration-300"
+            [class.border-r]="isHoop1 && !game.isSinglePlayer()"
+            [class.border-slate-800]="isHoop1 && !game.isSinglePlayer()"
+            [class.opacity-30]="!isActive"
+            [style.background]="
+              isActive
+                ? 'radial-gradient(circle at 50% 35%, ' + player.color + '33, transparent 70%)'
+                : 'transparent'
+            "
+          >
+            <!-- Player header -->
+            <div class="flex flex-col items-center gap-2">
+              <app-player-badge [player]="player" [size]="64" />
+              <span class="text-2xl font-bold">{{ player.name }}</span>
+              <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Hoop {{ hoop }}
+              </span>
+            </div>
+
+            <!-- Per-turn stage: shot clock, then made/missed verdict -->
+            <div class="flex min-h-48 flex-col items-center justify-center gap-3">
+              @if (isActive && game.isPracticeTurn()) {
+                <span class="rounded-full bg-slate-700/80 px-3 py-1 text-xs font-bold uppercase tracking-widest text-slate-300">
+                  Practice shot · round already a strike
+                </span>
+              }
+              @if (isActive && game.turnPhase() === 'ready') {
+                <span class="animate-pulse text-3xl font-black uppercase tracking-widest text-orange-400">
+                  Get Ready
+                </span>
+              } @else if (isActive && game.turnPhase() === 'shooting') {
+                <span
+                  class="text-[8rem] font-black leading-none tabular-nums sm:text-[11rem]"
+                  [class.text-red-500]="game.secondsToShoot() <= 1"
+                >
+                  {{ game.secondsToShoot() }}
+                </span>
+                <div class="h-2 w-48 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    class="h-full bg-orange-400 transition-[width] duration-100 ease-linear"
+                    [style.width.%]="game.turnFraction() * 100"
+                  ></div>
+                </div>
+                <span class="text-sm font-semibold uppercase tracking-widest text-slate-400">
+                  Shoot!
+                </span>
+              } @else if (isActive && game.turnPhase() === 'result') {
+                @if (game.turnOutcome() === 'made') {
+                  <span class="text-6xl font-black uppercase tracking-wider text-green-400 sm:text-7xl">
+                    Score!
+                  </span>
+                } @else {
+                  <span class="text-6xl font-black uppercase tracking-wider text-red-500 sm:text-7xl">
+                    Miss
+                  </span>
+                }
+              }
+            </div>
+
+            <!-- Strikes (vs mode: each player tracks their own) -->
+            @if (!game.isTeam()) {
+              <div class="flex items-center gap-2">
+                @for (used of strikePips(hoop); track $index) {
+                  <span
+                    class="flex h-9 w-9 items-center justify-center rounded-full border-2 text-lg font-black transition"
+                    [class.border-red-500]="used"
+                    [class.bg-red-500]="used"
+                    [class.text-white]="used"
+                    [class.border-slate-700]="!used"
+                    [class.text-slate-700]="!used"
+                  >✕</span>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Sensor connection status (overlay, top-left) -->
+    <div class="absolute left-4 top-4">
+      <app-mqtt-status-indicator />
+    </div>
+
+    <!-- Round header (overlay, centered top) -->
+    <div class="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2">
+      <div class="flex flex-col items-center rounded-2xl bg-slate-900/80 px-8 py-3 text-center shadow-lg ring-1 ring-white/10 backdrop-blur">
+        <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ setup.mode.name }}</span>
+        <span class="text-3xl font-black tabular-nums">Round {{ game.round() }}</span>
+
+        <!-- Team strikes (shared) -->
+        @if (game.isTeam()) {
+          <div class="mt-2 flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Team</span>
+            @for (used of teamStrikePips(); track $index) {
+              <span
+                class="flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm font-black transition"
+                [class.border-red-500]="used"
+                [class.bg-red-500]="used"
+                [class.text-white]="used"
+                [class.border-slate-700]="!used"
+                [class.text-slate-700]="!used"
+              >✕</span>
+            }
+          </div>
+        }
+
+        <!-- Round outcome flash (between rounds) -->
+        @if (game.roundOutcome(); as outcome) {
+          <span
+            class="mt-2 text-sm font-black uppercase tracking-[0.2em]"
+            [class.text-red-500]="outcome.struck"
+            [class.text-green-400]="!outcome.struck"
+          >
+            {{ outcome.message }}
+          </span>
+        }
+      </div>
+    </div>
+
+    <!-- Preparing overlay (while sounds download) -->
+    @if (game.status() === 'preparing') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-slate-950/90 backdrop-blur-sm">
+        <i class="pi pi-spin pi-spinner text-6xl text-orange-400"></i>
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Preparing…</span>
+      </div>
+    }
+
+    <!-- Pre-game countdown overlay -->
+    @if (game.status() === 'countdown') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Get Ready</span>
+        <span class="text-[12rem] font-black leading-none text-white">{{ game.countdownValue() }}</span>
+      </div>
+    }
+  </div>
+}

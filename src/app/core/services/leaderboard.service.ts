@@ -1,8 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../supabase/supabase.client';
 import { GameModeId } from '../models/game-mode.model';
-import { LeaderboardEntry } from '../models/leaderboard.model';
+import { LeaderboardEntry, TeamLeaderboardEntry } from '../models/leaderboard.model';
 import { Player } from '../models/player.model';
+
+/** The mode id whose games feed the team leaderboard. */
+const TEAM_MODE: GameModeId = 'back-to-back-team';
 
 /** Shape of an embedded player row returned alongside a game. */
 interface EmbeddedPlayer {
@@ -108,14 +111,89 @@ export class LeaderboardService {
     }
     return placement;
   }
+
+  /**
+   * Top team performances for the "back to back team" mode, ranked by rounds
+   * survived (highest first; older runs win ties). Each game is one team entry —
+   * the duo (or lone solo player) — rather than two per-hoop performances.
+   * Rounds survived is stored in the score columns by the game service.
+   * Returns an empty list when Supabase is not configured.
+   */
+  async topTeamScores(limit = 3): Promise<TeamLeaderboardEntry[]> {
+    const client = this.supabase.client;
+    if (!client) {
+      return [];
+    }
+
+    const { data, error } = await client
+      .from('games')
+      .select(
+        `created_at,
+         hoop1_score,
+         hoop1_player:players!games_hoop1_player_id_fkey (id, name, color, created_at),
+         hoop2_player:players!games_hoop2_player_id_fkey (id, name, color, created_at)`,
+      )
+      .eq('mode', TEAM_MODE);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const entries: TeamLeaderboardEntry[] = [];
+    for (const game of (data ?? []) as unknown as TeamGameRow[]) {
+      const players = [game.hoop1_player, game.hoop2_player]
+        .filter((p): p is EmbeddedPlayer => !!p)
+        .map(toPlayer);
+      if (!players.length) continue;
+      entries.push({ players, roundsSurvived: game.hoop1_score, playedAt: game.created_at });
+    }
+
+    entries.sort(
+      (a, b) => b.roundsSurvived - a.roundsSurvived || a.playedAt.localeCompare(b.playedAt),
+    );
+    return entries.slice(0, limit);
+  }
+
+  /**
+   * The 1-based placement a team's rounds-survived earns on the team
+   * leaderboard (1 = top). Assumes the run has already been persisted, so its
+   * own row is counted. Returns null when Supabase is not configured.
+   */
+  async placementForTeamRounds(roundsSurvived: number): Promise<number | null> {
+    const client = this.supabase.client;
+    if (!client) {
+      return null;
+    }
+
+    const { data, error } = await client
+      .from('games')
+      .select('hoop1_score, hoop1_player_id')
+      .eq('mode', TEAM_MODE);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    let placement = 0;
+    for (const game of data ?? []) {
+      if (game.hoop1_player_id && game.hoop1_score >= roundsSurvived) placement++;
+    }
+    return placement;
+  }
+}
+
+/** A team `games` row with both players embedded; score holds rounds survived. */
+interface TeamGameRow {
+  created_at: string;
+  hoop1_score: number;
+  hoop1_player: EmbeddedPlayer | null;
+  hoop2_player: EmbeddedPlayer | null;
+}
+
+function toPlayer(row: EmbeddedPlayer): Player {
+  return { id: row.id, name: row.name, color: row.color, createdAt: row.created_at };
 }
 
 function toEntry(row: EmbeddedPlayer, score: number, playedAt: string): LeaderboardEntry {
-  const player: Player = {
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    createdAt: row.created_at,
-  };
-  return { player, score, playedAt };
+  return { player: toPlayer(row), score, playedAt };
 }

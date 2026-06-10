@@ -19,5 +19,19 @@ export const routes: Routes = [
       import('./features/results/results-page').then((m) => m.ResultsPage),
     title: 'Results',
   },
+  {
+    path: 'back-to-back',
+    loadComponent: () =>
+      import('./features/back-to-back/back-to-back-page').then((m) => m.BackToBackPage),
+    title: 'Back to Back',
+  },
+  {
+    path: 'back-to-back/results',
+    loadComponent: () =>
+      import('./features/back-to-back/back-to-back-results-page').then(
+        (m) => m.BackToBackResultsPage,
+      ),
+    title: 'Back to Back · Results',
+  },
   { path: '**', redirectTo: '' },
 ];
