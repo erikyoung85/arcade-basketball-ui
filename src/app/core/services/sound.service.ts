@@ -137,6 +137,15 @@ export class SoundService {
   /** Live <audio> elements, keyed by sound, so we can stop/replace them. */
   private readonly elements = new Map<SoundName, HTMLAudioElement>();
 
+  /**
+   * Downloaded audio files held in memory as blob object-URLs, keyed by their
+   * configured `src`. Because the service is app-wide (`providedIn: 'root'`)
+   * this map outlives any single game, so a file fetched for the first game is
+   * reused by every later one — no re-downloading. Playing a cached source
+   * creates an <audio> backed by this in-memory blob, so it starts instantly.
+   */
+  private readonly cache = new Map<string, string>();
+
   /** Lazily-created Web Audio context for the synthesized fallbacks. */
   private audioContext: AudioContext | null = null;
   /** Active synth nodes per sound, so a looping synth can be stopped. */
@@ -157,16 +166,19 @@ export class SoundService {
 
   /**
    * Download every audio file the game will need so playback isn't delayed by a
-   * slow connection mid-game. Resolves once each file is buffered enough to play
-   * through (or has errored/timed out — the synth fallbacks cover failures, so a
-   * missing or slow file never blocks the game forever).
+   * slow connection mid-game. Resolves once each file is fully downloaded into
+   * memory (or has errored/timed out — the synth fallbacks cover failures, so a
+   * missing or slow file never blocks the game forever). The game waits on this
+   * before the 3·2·1 countdown, so sounds are ready to play the instant they're
+   * needed.
    *
-   * Files are fetched into the browser's HTTP cache here; the `<audio>` elements
-   * created later when sounds actually play then load instantly from cache.
-   * Text-to-speech announcements need no preloading and are skipped.
+   * Each file is fetched once and held as an in-memory blob (see `cache`);
+   * sources already downloaded by an earlier game are skipped, so subsequent
+   * games start without re-downloading anything. Text-to-speech announcements
+   * need no preloading and are skipped.
    */
   async preload(): Promise<void> {
-    await Promise.all(this.fileSources().map((src) => this.preloadOne(src)));
+    await Promise.all(this.fileSources().map((src) => this.cacheOne(src)));
   }
 
   /** Distinct local/remote audio file sources the game uses (TTS excluded). */
@@ -181,29 +193,38 @@ export class SoundService {
     return [...new Set(srcs.filter((src) => !!src))];
   }
 
-  /** Buffer one audio file, resolving when it's ready or has given up. */
-  private preloadOne(src: string): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const audio = new Audio();
-      audio.preload = 'auto';
+  /**
+   * Download one audio file into the in-memory blob cache, resolving when it's
+   * ready or has given up (already cached → instant; timeout/error/abort →
+   * left uncached so the synth fallback covers it). Caching the whole blob —
+   * rather than relying on the HTTP cache — guarantees later playback is served
+   * straight from memory and never re-downloads across games.
+   */
+  private async cacheOne(src: string): Promise<void> {
+    if (this.cache.has(src)) return; // already downloaded in an earlier game
 
-      let settled = false;
-      const done = (): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve();
-      };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PRELOAD_TIMEOUT_MS);
+    try {
+      const response = await fetch(this.resolveSrc(src), { signal: controller.signal });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      this.cache.set(src, URL.createObjectURL(blob));
+    } catch {
+      // Network error, 404, or timeout/abort — leave it uncached. Playback
+      // falls back to the network URL and ultimately the synth version.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
-      // `canplaythrough` fires once enough is buffered to play to the end without
-      // stalling — i.e. the file is, for our purposes, fully loaded.
-      audio.addEventListener('canplaythrough', done, { once: true });
-      audio.addEventListener('error', done, { once: true });
-      const timer = setTimeout(done, PRELOAD_TIMEOUT_MS);
-
-      audio.src = this.resolveSrc(src);
-      audio.load();
-    });
+  /**
+   * A ready-to-play <audio> for a configured `src`: backed by the in-memory
+   * blob when it was preloaded (instant, no network), otherwise pointed at the
+   * resolved network URL as a last resort.
+   */
+  private audioFor(src: string): HTMLAudioElement {
+    return new Audio(this.cache.get(src) ?? this.resolveSrc(src));
   }
 
   /** Play the pre-game countdown sound once. */
@@ -214,7 +235,7 @@ export class SoundService {
       return;
     }
     this.stop('countdown');
-    const audio = new Audio(this.resolveSrc(config.src));
+    const audio = this.audioFor(config.src);
     audio.volume = config.volume;
     audio.loop = config.loop;
     this.elements.set('countdown', audio);
@@ -235,7 +256,7 @@ export class SoundService {
     const start = track.startSeconds || 0;
     const end = track.endSeconds && track.endSeconds > start ? track.endSeconds : null;
 
-    const audio = new Audio(this.resolveSrc(track.src));
+    const audio = this.audioFor(track.src);
     audio.volume = track.volume;
     this.elements.set('backgroundMusic', audio);
 
@@ -290,7 +311,7 @@ export class SoundService {
     // A recording was provided — it takes priority over text-to-speech.
     if (src) {
       this.stop(name);
-      const audio = new Audio(this.resolveSrc(src));
+      const audio = this.audioFor(src);
       audio.volume = volume;
       this.elements.set(name, audio);
       audio.addEventListener('error', () => this.fallbackToSynth(name, volume));
