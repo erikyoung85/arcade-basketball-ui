@@ -151,12 +151,8 @@ export class SoundService {
   private initSpeechSynthesis(): void {
     const synth = window.speechSynthesis;
 
+    console.log(synth.getVoices());
     synth.speak(new SpeechSynthesisUtterance(' '));
-    synth.cancel();
-
-    setTimeout(() => {
-      console.log(synth.getVoices());
-    }, 1000);
   }
 
   /**
