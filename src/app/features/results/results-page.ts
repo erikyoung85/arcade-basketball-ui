@@ -4,6 +4,7 @@ import { Button } from 'primeng/button';
 
 import { GameService } from '../../core/services/game.service';
 import { LeaderboardService } from '../../core/services/leaderboard.service';
+import { SetupStateService } from '../../core/services/setup-state.service';
 import { PlayerBadge } from '../../shared/player-badge';
 
 /** Medal emoji for the top three places — matches the home-page leaderboard. */
@@ -23,6 +24,7 @@ export class ResultsPage {
   private readonly router = inject(Router);
   protected readonly game = inject(GameService);
   private readonly leaderboard = inject(LeaderboardService);
+  private readonly setupState = inject(SetupStateService);
   protected readonly result = this.game.result;
 
   /** Banner text describing the outcome. */
@@ -113,9 +115,10 @@ export class ResultsPage {
     void this.router.navigate(['/game']);
   }
 
-  /** Clear state and go back to player selection. */
+  /** Clear state and go back to the start of the setup wizard. */
   protected newGame(): void {
     this.game.reset();
+    this.setupState.step.set(1);
     void this.router.navigate(['/']);
   }
 }

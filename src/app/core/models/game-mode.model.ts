@@ -122,3 +122,65 @@ export const GAME_MODES: readonly GameMode[] = [
 ];
 
 export const DEFAULT_GAME_MODE: GameMode = GAME_MODES[0];
+
+/** Look up a mode by id, throwing if it doesn't exist (build-time safety). */
+function mode(id: GameModeId): GameMode {
+  const found = GAME_MODES.find((m) => m.id === id);
+  if (!found) throw new Error(`Unknown game mode: ${id}`);
+  return found;
+}
+
+/** A selectable sub-option within a {@link GameModeGroup}. */
+export interface GameModeVariant {
+  /** Short label for the sub-option button (e.g. "VS", "Team"). */
+  label: string;
+  mode: GameMode;
+}
+
+/**
+ * A group of related game modes shown as a single card on the setup screen.
+ * Most groups hold one mode; groups with multiple variants (e.g. Back to Back)
+ * reveal sub-option buttons once selected so the operator can pick the exact
+ * game to play.
+ */
+export interface GameModeGroup {
+  id: string;
+  name: string;
+  /** Blurb shown on the group card. */
+  description: string;
+  /** PrimeIcons class for the group card. */
+  icon: string;
+  variants: readonly GameModeVariant[];
+}
+
+/** Game mode groups, in display order, for the setup screen. */
+export const GAME_MODE_GROUPS: readonly GameModeGroup[] = [
+  {
+    id: 'standard',
+    name: 'Standard',
+    description: mode('standard').description,
+    icon: 'pi pi-bolt',
+    variants: [{ label: 'Standard', mode: mode('standard') }],
+  },
+  {
+    id: 'clutch',
+    name: 'Clutch Time',
+    description: mode('clutch').description,
+    icon: 'pi pi-clock',
+    variants: [{ label: 'Clutch Time', mode: mode('clutch') }],
+  },
+  {
+    id: 'back-to-back',
+    name: 'Back to Back',
+    description:
+      'Take turns under a per-shot clock — three strikes and the run ends. Play head-to-head (VS) or co-operatively (Team). Both need two players.',
+    icon: 'pi pi-sync',
+    variants: [
+      { label: 'VS', mode: mode('back-to-back-vs') },
+      { label: 'Team', mode: mode('back-to-back-team') },
+    ],
+  },
+];
+
+/** The group selected by default when the setup screen first loads. */
+export const DEFAULT_GAME_MODE_GROUP: GameModeGroup = GAME_MODE_GROUPS[0];

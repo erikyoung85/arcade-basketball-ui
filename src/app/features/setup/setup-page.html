@@ -1,130 +1,229 @@
 <div class="min-h-dvh w-full bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white">
-  <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-8">
+  <div class="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-6">
+    <!-- Top bar: sensor status + test mode. Visible only during setup (the game
+         and results live on their own routes). -->
+    <div class="mb-6 flex items-center justify-between gap-3">
+      <app-mqtt-status-indicator />
+      <p-button
+        label="Test Mode"
+        icon="pi pi-wrench"
+        severity="secondary"
+        [text]="true"
+        [disabled]="!sensorsReady()"
+        (onClick)="openTestMode()"
+      />
+    </div>
+
     <!-- Header -->
     <header class="mb-8 text-center">
-      <div class="mb-4 flex justify-center">
-        <app-mqtt-status-indicator />
-      </div>
       <h1 class="text-4xl font-black tracking-tight sm:text-5xl">
         🏀 Arcade <span class="text-orange-400">Basketball</span>
       </h1>
-      <p class="mt-2 text-lg text-slate-400">Pick your players, choose a mode, and ball out.</p>
+      <p class="mt-2 text-lg text-slate-400">
+        @if (step() === 1) {
+          Step 1 of 2 — choose your game mode.
+        } @else {
+          Step 2 of 2 — pick your players and ball out.
+        }
+      </p>
     </header>
 
-    <!-- Game mode -->
-    <section class="mb-8">
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Game Mode</h2>
-      <div class="grid gap-4 grid-cols-2">
-        @for (mode of modes; track mode.id) {
-          <button
-            type="button"
-            (click)="selectedMode.set(mode)"
-            class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
-            [class.border-orange-400]="selectedMode().id === mode.id"
-            [class.border-slate-700]="selectedMode().id !== mode.id"
-            [style.background-color]="
-              selectedMode().id === mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'
-            "
-          >
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex items-center gap-2 text-xl font-bold">
-                {{ mode.name }}
-                @if (mode.requiresTwoPlayers) {
-                  <span
-                    class="inline-flex items-center gap-1 rounded-full bg-orange-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-300"
-                    title="Requires 2 players"
-                  >
-                    <i class="pi pi-users text-xs"></i>
-                    2P only
-                  </span>
+    @if (step() === 1) {
+      <!-- ============================ STEP 1 ============================ -->
+
+      <!-- Game mode groups -->
+      <section class="mb-6">
+        <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
+          Game Mode
+        </h2>
+        <div class="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          @for (group of groups; track group.id) {
+            <button
+              type="button"
+              (click)="selectGroup(group)"
+              class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
+              [class.border-orange-400]="groupId() === group.id"
+              [class.border-slate-700]="groupId() !== group.id"
+              [style.background-color]="
+                groupId() === group.id ? 'rgba(251,146,60,0.12)' : 'transparent'
+              "
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="flex items-center gap-2 text-xl font-bold">
+                  <i [class]="group.icon + ' text-orange-400'"></i>
+                  {{ group.name }}
+                </span>
+                @if (groupId() === group.id) {
+                  <i class="pi pi-check-circle text-2xl text-orange-400"></i>
                 }
-              </span>
-              @if (selectedMode().id === mode.id) {
-                <i class="pi pi-check-circle text-2xl text-orange-400"></i>
-              }
-            </div>
-            <p class="mt-1 text-sm text-slate-400">{{ mode.description }}</p>
-          </button>
-        }
-      </div>
-    </section>
-
-    <!-- Hoop player selection -->
-    <section class="mb-8">
-      <div class="mb-3 flex items-baseline justify-between gap-3">
-        <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
-        <span class="text-xs text-slate-500">
-          @if (isVersusMode()) {
-            Back to Back VS needs two players.
-          } @else if (isTeamMode()) {
-            Back to Back Team needs two players.
-          } @else {
-            Pick two to compete, or just one to play solo for the leaderboard.
+              </div>
+              <p class="mt-1 text-sm text-slate-400">{{ group.description }}</p>
+            </button>
           }
-        </span>
-      </div>
-      <div class="grid gap-4 grid-cols-2">
-        @for (hoop of [1, 2]; track hoop) {
-          @let player = hoop === 1 ? hoop1Player() : hoop2Player();
-          <button
-            type="button"
-            (click)="openPicker(hoop === 1 ? 1 : 2)"
-            class="flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-700 p-6 transition active:scale-[0.98] hover:border-orange-400"
-          >
-            <span class="text-sm font-semibold uppercase tracking-widest text-orange-400">
-              Hoop {{ hoop }}
-            </span>
-            @if (player) {
-              <app-player-badge [player]="player" [size]="80" />
-              <span class="text-2xl font-bold">{{ player.name }}</span>
-              <span class="text-sm text-slate-400">Tap to change</span>
-            } @else {
-              <i class="pi pi-user-plus text-5xl text-slate-600"></i>
-              <span class="text-lg font-semibold text-slate-300">Select Player</span>
+        </div>
+      </section>
+
+      <!-- Sub-options for groups that need extra configuration (e.g. Back to Back) -->
+      @if (needsVariant()) {
+        <section class="mb-6">
+          <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
+            {{ selectedGroup().name }} — choose a format
+          </h2>
+          <div class="grid gap-4 grid-cols-2">
+            @for (variant of selectedGroup().variants; track variant.mode.id) {
+              <button
+                type="button"
+                (click)="selectVariant(variant.mode)"
+                class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
+                [class.border-orange-400]="selectedMode()?.id === variant.mode.id"
+                [class.border-slate-700]="selectedMode()?.id !== variant.mode.id"
+                [style.background-color]="
+                  selectedMode()?.id === variant.mode.id ? 'rgba(251,146,60,0.12)' : 'transparent'
+                "
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="flex items-center gap-2 text-lg font-bold">
+                    {{ variant.label }}
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full bg-orange-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-300"
+                      title="Requires 2 players"
+                    >
+                      <i class="pi pi-users text-xs"></i>
+                      2P only
+                    </span>
+                  </span>
+                  @if (selectedMode()?.id === variant.mode.id) {
+                    <i class="pi pi-check-circle text-2xl text-orange-400"></i>
+                  }
+                </div>
+                <p class="mt-1 text-sm text-slate-400">{{ variant.mode.description }}</p>
+              </button>
             }
-          </button>
+          </div>
+        </section>
+      }
+
+      <!-- Leaderboard. Team mode has its own duo board; VS has no leaderboard. -->
+      <div class="mb-8 flex-1">
+        @if (!selectedMode()) {
+          <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
+            Choose a format above to see its leaderboard.
+          </p>
+        } @else if (isTeamMode()) {
+          <app-team-leaderboard />
+        } @else if (isVersusMode()) {
+          <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
+            Head-to-head — first to 3 strikes loses. No leaderboard for this mode.
+          </p>
+        } @else {
+          <app-leaderboard [mode]="selectedMode()!" />
         }
       </div>
-    </section>
 
-    <!-- Leaderboard. Team mode has its own duo board; VS has no leaderboard. -->
-    <div class="mb-8 flex-1">
-      @if (isTeamMode()) {
-        <app-team-leaderboard />
-      } @else if (isVersusMode()) {
-        <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
-          Head-to-head — first to 3 strikes loses. No leaderboard for this mode.
-        </p>
-      } @else {
-        <app-leaderboard [mode]="selectedMode()" />
-      }
-    </div>
-
-    <!-- Start -->
-    <div class="sticky bottom-0 pb-2 pt-4">
-      @if (playersReady() && !sensorsReady()) {
-        <p class="mb-2 text-center text-sm font-semibold text-red-400">
-          Waiting for the hoop sensors to connect…
-        </p>
-      }
-      <p-button
-        label="Start Game"
-        icon="pi pi-play"
-        [disabled]="!canStart()"
-        (onClick)="startGame()"
-        styleClass="w-full justify-center !py-5 !text-2xl !font-bold"
-      />
-      <div class="mt-3 text-center">
+      <!-- Continue -->
+      <div class="sticky bottom-0 pb-2 pt-4">
         <p-button
-          label="Test Mode"
-          icon="pi pi-wrench"
-          severity="secondary"
-          [text]="true"
-          [disabled]="!sensorsReady()"
-          (onClick)="openTestMode()"
+          label="Continue"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          [disabled]="!canContinue()"
+          (onClick)="goToPlayers()"
+          styleClass="w-full justify-center !py-5 !text-2xl !font-bold"
         />
       </div>
-    </div>
+    } @else {
+      <!-- ============================ STEP 2 ============================ -->
+
+      <!-- Back to mode selection -->
+      <div class="mb-4">
+        <p-button
+          label="Back to Game Modes"
+          icon="pi pi-arrow-left"
+          severity="secondary"
+          [text]="true"
+          (onClick)="backToModes()"
+          styleClass="!font-semibold"
+        />
+      </div>
+
+      <!-- Chosen mode summary + back to mode selection -->
+      <div class="mb-6 flex items-center justify-between gap-3 rounded-2xl border-2 border-slate-700 p-4">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Mode</span>
+          <p class="text-xl font-bold">{{ selectedMode()?.name }}</p>
+        </div>
+        <p-button
+          label="Change"
+          icon="pi pi-times"
+          severity="secondary"
+          [text]="false"
+          (onClick)="backToModes()"
+        />
+      </div>
+
+      <!-- Hoop player selection -->
+      <section class="mb-8 flex-1">
+        <div class="mb-3 flex items-baseline justify-between gap-3">
+          <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
+          <span class="text-xs text-slate-500">
+            @if (requiresTwoPlayers()) {
+              {{ selectedMode()?.name }} needs two players.
+            } @else {
+              Pick two to compete, or just one to play solo for the leaderboard.
+            }
+          </span>
+        </div>
+        <div class="grid gap-4 grid-cols-2">
+          @for (hoop of [1, 2]; track hoop) {
+            @let player = hoop === 1 ? hoop1Player() : hoop2Player();
+            @let games = gamesPlayedFor(hoop === 1 ? 1 : 2);
+            <button
+              type="button"
+              (click)="openPicker(hoop === 1 ? 1 : 2)"
+              class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-700 p-6 transition active:scale-[0.98] hover:border-orange-400"
+            >
+              <span class="text-sm font-semibold uppercase tracking-widest text-orange-400">
+                Hoop {{ hoop }}
+              </span>
+              @if (player) {
+                <app-player-badge [player]="player" [size]="80" />
+                <span class="text-2xl font-bold">{{ player.name }}</span>
+                @if (games !== undefined) {
+                  <span class="text-sm text-slate-400">
+                    {{ games }} {{ games === 1 ? 'game' : 'games' }} in this mode
+                  </span>
+                }
+                <span class="text-xs text-slate-500">Tap to change</span>
+              } @else {
+                <i class="pi pi-user-plus text-5xl text-slate-600"></i>
+                <span class="text-lg font-semibold text-slate-300">Select Player</span>
+              }
+            </button>
+          }
+        </div>
+      </section>
+
+      <!-- Start -->
+      <div class="sticky bottom-0 pb-2 pt-4">
+        @if (requiresTwoPlayers() && !playersReady()) {
+          <p class="mb-2 text-center text-sm font-semibold text-orange-300">
+            Select a player for both hoops to start.
+          </p>
+        }
+        @if (playersReady() && !sensorsReady()) {
+          <p class="mb-2 text-center text-sm font-semibold text-red-400">
+            Waiting for the hoop sensors to connect…
+          </p>
+        }
+        <p-button
+          label="Start Game"
+          icon="pi pi-play"
+          [disabled]="!canStart()"
+          (onClick)="startGame()"
+          styleClass="w-full justify-center !py-5 !text-2xl !font-bold"
+        />
+      </div>
+    }
   </div>
 </div>
 

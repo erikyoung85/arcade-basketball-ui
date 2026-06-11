@@ -113,6 +113,30 @@ export class LeaderboardService {
   }
 
   /**
+   * How many games in a mode a player has completed, counting either hoop.
+   * Used on the player-selection step to show each player's experience in the
+   * chosen mode. Returns 0 when Supabase is not configured.
+   */
+  async gamesPlayed(mode: GameModeId, playerId: string): Promise<number> {
+    const client = this.supabase.client;
+    if (!client) {
+      return 0;
+    }
+
+    const { count, error } = await client
+      .from('games')
+      .select('*', { count: 'exact', head: true })
+      .eq('mode', mode)
+      .or(`hoop1_player_id.eq.${playerId},hoop2_player_id.eq.${playerId}`);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return count ?? 0;
+  }
+
+  /**
    * Top team performances for the "back to back team" mode, ranked by rounds
    * survived (highest first; older runs win ties). Each game is one team entry —
    * the duo (or lone solo player) — rather than two per-hoop performances.

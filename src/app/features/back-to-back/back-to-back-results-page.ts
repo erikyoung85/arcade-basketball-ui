@@ -4,6 +4,7 @@ import { Button } from 'primeng/button';
 
 import { BackToBackService } from '../../core/services/back-to-back.service';
 import { LeaderboardService } from '../../core/services/leaderboard.service';
+import { SetupStateService } from '../../core/services/setup-state.service';
 import { HoopId } from '../../core/models/game.model';
 import { PlayerBadge } from '../../shared/player-badge';
 
@@ -26,6 +27,7 @@ export class BackToBackResultsPage {
   private readonly router = inject(Router);
   protected readonly game = inject(BackToBackService);
   private readonly leaderboard = inject(LeaderboardService);
+  private readonly setupState = inject(SetupStateService);
   protected readonly result = this.game.result;
 
   protected readonly hoops: HoopId[] = [1, 2];
@@ -111,9 +113,10 @@ export class BackToBackResultsPage {
     void this.router.navigate(['/back-to-back']);
   }
 
-  /** Clear state and go back to player selection. */
+  /** Clear state and go back to the start of the setup wizard. */
   protected newGame(): void {
     this.game.reset();
+    this.setupState.step.set(1);
     void this.router.navigate(['/']);
   }
 }
