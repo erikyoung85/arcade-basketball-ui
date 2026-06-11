@@ -49,7 +49,9 @@ export interface BackToBackResult {
   loser: Player | null;
   /** True for the co-operative team mode, false for head-to-head vs. */
   isTeam: boolean;
-  /** True when only one hoop had a player (team mode played solo). */
+  /** True for the single-player solo run (its own leaderboard). */
+  isSolo: boolean;
+  /** True when only one hoop had a player (solo, or a team run played alone). */
   isSinglePlayer: boolean;
 }
 

@@ -98,10 +98,12 @@
         <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ setup.mode.name }}</span>
         <span class="text-3xl font-black tabular-nums">Round {{ game.round() }}</span>
 
-        <!-- Team strikes (shared) -->
+        <!-- Shared strikes (team, or the lone solo player) -->
         @if (game.isTeam()) {
           <div class="mt-2 flex items-center gap-2">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">Team</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              {{ game.isSolo() ? 'Strikes' : 'Team' }}
+            </span>
             @for (used of teamStrikePips(); track $index) {
               <span
                 class="flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm font-black transition"

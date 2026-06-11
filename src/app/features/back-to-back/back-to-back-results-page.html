@@ -63,7 +63,9 @@
               } @else {
                 <span class="text-2xl font-black">{{ ordinal(place) }} place</span>
               }
-              <span class="mt-0.5 text-xs text-slate-400">Back to Back Team leaderboard</span>
+              <span class="mt-0.5 text-xs text-slate-400">
+                {{ r.isSolo ? 'Back to Back Solo' : 'Back to Back Team' }} leaderboard
+              </span>
             }
           </div>
         </div>

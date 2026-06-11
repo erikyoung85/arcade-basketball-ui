@@ -1,14 +1,16 @@
-import { ChangeDetectionStrategy, Component, inject, resource } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, resource } from '@angular/core';
 
 import { LeaderboardService } from '../../core/services/leaderboard.service';
+import { GameModeId } from '../../core/models/game-mode.model';
 import { PlayerBadge } from '../../shared/player-badge';
 
 /** Medal emoji for the top three ranks; plain number after that. */
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 /**
- * Shows the top teams for the "back to back team" mode, ranked by how many
- * rounds the duo (or lone solo player) survived.
+ * Shows the top teams for a rounds-survived "back to back" mode (Team or Solo),
+ * ranked by how many rounds the duo (or lone solo player) survived. The mode and
+ * heading are inputs so the same board serves both the Team and Solo formats.
  */
 @Component({
   selector: 'app-team-leaderboard',
@@ -18,7 +20,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
     <section>
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
         <i class="pi pi-trophy text-orange-400"></i>
-        Leaderboard — Back to Back Team
+        Leaderboard — {{ heading() }}
       </h2>
 
       @if (entries.isLoading()) {
@@ -65,8 +67,14 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 export class TeamLeaderboard {
   private readonly leaderboard = inject(LeaderboardService);
 
+  /** Which rounds-survived board to show. */
+  readonly mode = input<GameModeId>('back-to-back-team');
+  /** Heading shown after "Leaderboard — ". */
+  readonly heading = input('Back to Back Team');
+
   protected readonly entries = resource({
-    loader: () => this.leaderboard.topTeamScores(3),
+    params: () => ({ mode: this.mode() }),
+    loader: ({ params }) => this.leaderboard.topTeamScores(params.mode, 3),
   });
 
   protected rank(index: number): string {

@@ -51,11 +51,11 @@ export class BackToBackResultsPage {
     params: () => {
       const r = this.result();
       if (!r || !r.isTeam) return undefined;
-      return { rounds: r.roundsSurvived };
+      return { mode: r.mode.id, rounds: r.roundsSurvived };
     },
     loader: async ({ params }) => {
       await this.game.whenPersisted();
-      return this.leaderboard.placementForTeamRounds(params.rounds);
+      return this.leaderboard.placementForTeamRounds(params.mode, params.rounds);
     },
   });
 

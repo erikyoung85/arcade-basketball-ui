@@ -69,7 +69,7 @@
           <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
             {{ selectedGroup().name }} — choose a format
           </h2>
-          <div class="grid gap-4 grid-cols-2">
+          <div class="grid gap-4 grid-cols-1 sm:grid-cols-3">
             @for (variant of selectedGroup().variants; track variant.mode.id) {
               <button
                 type="button"
@@ -84,13 +84,23 @@
                 <div class="flex items-center justify-between gap-2">
                   <span class="flex items-center gap-2 text-lg font-bold">
                     {{ variant.label }}
-                    <span
-                      class="inline-flex items-center gap-1 rounded-full bg-orange-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-300"
-                      title="Requires 2 players"
-                    >
-                      <i class="pi pi-users text-xs"></i>
-                      2P only
-                    </span>
+                    @if (variant.mode.requiresTwoPlayers) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-orange-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-300"
+                        title="Requires 2 players"
+                      >
+                        <i class="pi pi-users text-xs"></i>
+                        2P only
+                      </span>
+                    } @else if (variant.mode.requiresSoloPlayer) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-sky-400/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-300"
+                        title="Single player"
+                      >
+                        <i class="pi pi-user text-xs"></i>
+                        1P
+                      </span>
+                    }
                   </span>
                   @if (selectedMode()?.id === variant.mode.id) {
                     <i class="pi pi-check-circle text-2xl text-orange-400"></i>
@@ -109,6 +119,8 @@
           <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
             Choose a format above to see its leaderboard.
           </p>
+        } @else if (isSoloMode()) {
+          <app-team-leaderboard mode="back-to-back-solo" heading="Back to Back Solo" />
         } @else if (isTeamMode()) {
           <app-team-leaderboard />
         } @else if (isVersusMode()) {
@@ -166,7 +178,9 @@
         <div class="mb-3 flex items-baseline justify-between gap-3">
           <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-400">Players</h2>
           <span class="text-xs text-slate-500">
-            @if (requiresTwoPlayers()) {
+            @if (isSoloMode()) {
+              {{ selectedMode()?.name }} is single-player — pick one player on either basket.
+            } @else if (requiresTwoPlayers()) {
               {{ selectedMode()?.name }} needs two players.
             } @else {
               Pick two to compete, or just one to play solo for the leaderboard.

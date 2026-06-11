@@ -104,8 +104,13 @@ export class SetupPage {
     return !!mode?.backToBack && !mode.backToBack.team;
   });
 
-  /** True when the selected mode is the co-operative "back to back team" mode. */
-  protected readonly isTeamMode = computed(() => !!this.selectedMode()?.backToBack?.team);
+  /** True when the selected mode is single-player only (one player, either basket). */
+  protected readonly isSoloMode = computed(() => !!this.selectedMode()?.requiresSoloPlayer);
+
+  /** True when the selected mode is the co-operative "back to back team" mode (not solo). */
+  protected readonly isTeamMode = computed(
+    () => !!this.selectedMode()?.backToBack?.team && !this.isSoloMode(),
+  );
 
   /** Whether the selected mode must be started with both hoops filled. */
   protected readonly requiresTwoPlayers = computed(
@@ -116,13 +121,15 @@ export class SetupPage {
   protected readonly canContinue = computed(() => !!this.selectedMode());
 
   /**
-   * Enough players are chosen to start. Versus needs both hoops filled; every
-   * other mode allows a single player (a solo run / solo team).
+   * Enough players are chosen to start. Solo needs exactly one player; Versus
+   * needs both hoops filled; every other mode allows one or two.
    */
   protected readonly playersReady = computed(() => {
-    const both = !!this.hoop1Player() && !!this.hoop2Player();
-    if (this.requiresTwoPlayers()) return both;
-    return both || !!this.hoop1Player() || !!this.hoop2Player();
+    const h1 = !!this.hoop1Player();
+    const h2 = !!this.hoop2Player();
+    if (this.isSoloMode()) return h1 !== h2;
+    if (this.requiresTwoPlayers()) return h1 && h2;
+    return (h1 && h2) || h1 || h2;
   });
 
   /** The hoop sensors are reachable over MQTT. */
@@ -163,6 +170,9 @@ export class SetupPage {
 
   protected selectVariant(mode: GameMode): void {
     this.selectedMode.set(mode);
+    // Solo is a single-player run — drop any second-hoop selection so we don't
+    // carry a stray player into a one-basket game.
+    if (mode.requiresSoloPlayer) this.hoop2Player.set(null);
   }
 
   protected goToPlayers(): void {
@@ -185,8 +195,13 @@ export class SetupPage {
     this.pickerHoop.set(null);
   }
 
-  /** A player already chosen on the *other* hoop, to disable in the picker. */
+  /**
+   * A player already chosen on the *other* hoop, to disable in the picker. In a
+   * single-player mode nothing is disabled — choosing a basket moves the lone
+   * player there (clearing the other hoop), so the same player must stay pickable.
+   */
   protected disabledPlayerId(): string | null {
+    if (this.isSoloMode()) return null;
     const hoop = this.pickerHoop();
     if (hoop === 1) return this.hoop2Player()?.id ?? null;
     if (hoop === 2) return this.hoop1Player()?.id ?? null;
@@ -194,10 +209,14 @@ export class SetupPage {
   }
 
   protected selectPlayer(player: Player): void {
+    const solo = this.isSoloMode();
     if (this.pickerHoop() === 1) {
       this.hoop1Player.set(player);
+      // Single-player modes hold one player total — picking a basket moves them.
+      if (solo) this.hoop2Player.set(null);
     } else if (this.pickerHoop() === 2) {
       this.hoop2Player.set(player);
+      if (solo) this.hoop1Player.set(null);
     }
     this.closePicker();
   }

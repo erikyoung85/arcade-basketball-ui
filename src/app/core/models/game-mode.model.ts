@@ -1,5 +1,10 @@
 /** Identifier for a game mode. Add new ids here as modes are introduced. */
-export type GameModeId = 'standard' | 'clutch' | 'back-to-back-vs' | 'back-to-back-team';
+export type GameModeId =
+  | 'standard'
+  | 'clutch'
+  | 'back-to-back-solo'
+  | 'back-to-back-vs'
+  | 'back-to-back-team';
 
 /**
  * Seconds each player has to make their shot on their turn in the back-to-back
@@ -53,7 +58,13 @@ export interface GameMode {
    * false (or omitted), a single player may play solo. Source of truth for the
    * setup screen's 2-player gate and "2 players only" tag.
    */
-  requiresTwoPlayers?: boolean;
+  requiresTwoPlayers: boolean;
+  /**
+   * When true, the mode is single-player only: exactly one player, who may pick
+   * either basket. Source of truth for the setup screen's solo player-count
+   * rule and "1P" tag, and for the solo back-to-back leaderboard/labels.
+   */
+  requiresSoloPlayer: boolean;
   /**
    * Optional late-game scoring boost. When set, shots made within the final
    * `thresholdSeconds` are worth `clutch.pointsPerShot` instead of
@@ -81,6 +92,8 @@ export const GAME_MODES: readonly GameMode[] = [
     description: '30 seconds. Most points wins. Every made shot is worth 2.',
     durationSeconds: 30,
     pointsPerShot: 2,
+    requiresSoloPlayer: false,
+    requiresTwoPlayers: false,
   },
   {
     id: 'clutch',
@@ -89,7 +102,24 @@ export const GAME_MODES: readonly GameMode[] = [
       '60 seconds. Baskets are worth 2 — but in the final 15 seconds it’s Clutch Time and every basket is worth 3.',
     durationSeconds: 60,
     pointsPerShot: 2,
+    requiresSoloPlayer: false,
+    requiresTwoPlayers: false,
     clutch: { thresholdSeconds: 15, pointsPerShot: 3 },
+  },
+  {
+    id: 'back-to-back-solo',
+    name: 'Back to Back - Solo',
+    description:
+      'Solo run. One basket, one shot each round against the clock. Miss and you take a strike — survive as many rounds as you can before three strikes ends the run.',
+    durationSeconds: TIME_TO_SHOOT_SECONDS,
+    pointsPerShot: 0,
+    requiresSoloPlayer: true,
+    requiresTwoPlayers: false,
+    backToBack: {
+      timeToShootSeconds: TIME_TO_SHOOT_SECONDS,
+      maxStrikes: BACK_TO_BACK_MAX_STRIKES,
+      team: true,
+    },
   },
   {
     id: 'back-to-back-vs',
@@ -98,6 +128,7 @@ export const GAME_MODES: readonly GameMode[] = [
       'Head-to-head. Players alternate single shots. Miss while your rival scores and you take a strike — three strikes and you lose.',
     durationSeconds: TIME_TO_SHOOT_SECONDS,
     pointsPerShot: 0,
+    requiresSoloPlayer: false,
     requiresTwoPlayers: true,
     backToBack: {
       timeToShootSeconds: TIME_TO_SHOOT_SECONDS,
@@ -112,6 +143,7 @@ export const GAME_MODES: readonly GameMode[] = [
       'Work as a team. Take turns shooting. Any miss in a round costs the team one strike. Survive as many rounds as you can before three strikes ends the run.',
     durationSeconds: TIME_TO_SHOOT_SECONDS,
     pointsPerShot: 0,
+    requiresSoloPlayer: false,
     requiresTwoPlayers: true,
     backToBack: {
       timeToShootSeconds: TIME_TO_SHOOT_SECONDS,
@@ -173,9 +205,10 @@ export const GAME_MODE_GROUPS: readonly GameModeGroup[] = [
     id: 'back-to-back',
     name: 'Back to Back',
     description:
-      'Take turns under a per-shot clock — three strikes and the run ends. Play head-to-head (VS) or co-operatively (Team). Both need two players.',
+      'Take turns under a per-shot clock — three strikes and the run ends. Go it alone (Solo), head-to-head (VS), or co-operatively (Team).',
     icon: 'pi pi-sync',
     variants: [
+      { label: 'Solo', mode: mode('back-to-back-solo') },
       { label: 'VS', mode: mode('back-to-back-vs') },
       { label: 'Team', mode: mode('back-to-back-team') },
     ],

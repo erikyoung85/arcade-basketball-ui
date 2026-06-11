@@ -107,8 +107,11 @@ export class BackToBackService {
   /** Max strikes this mode ends at, or 0 if not a back-to-back game. */
   readonly maxStrikes = computed(() => this._setup()?.mode.backToBack?.maxStrikes ?? 0);
 
-  /** True for the co-operative team mode. */
+  /** True for the co-operative team mode (includes the solo run). */
   readonly isTeam = computed(() => !!this._setup()?.mode.backToBack?.team);
+
+  /** True for the single-player solo run. */
+  readonly isSolo = computed(() => !!this._setup()?.mode.requiresSoloPlayer);
 
   /** True when only one hoop has a player (team mode played solo). */
   readonly isSinglePlayer = computed(() => {
@@ -467,6 +470,7 @@ export class BackToBackService {
       winner,
       loser,
       isTeam,
+      isSolo: !!setup.mode.requiresSoloPlayer,
       isSinglePlayer: this.isSinglePlayer(),
     };
 

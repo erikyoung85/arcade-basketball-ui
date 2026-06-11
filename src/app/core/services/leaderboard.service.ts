@@ -4,9 +4,6 @@ import { GameModeId } from '../models/game-mode.model';
 import { LeaderboardEntry, TeamLeaderboardEntry } from '../models/leaderboard.model';
 import { Player } from '../models/player.model';
 
-/** The mode id whose games feed the team leaderboard. */
-const TEAM_MODE: GameModeId = 'back-to-back-team';
-
 /** Shape of an embedded player row returned alongside a game. */
 interface EmbeddedPlayer {
   id: string;
@@ -137,13 +134,14 @@ export class LeaderboardService {
   }
 
   /**
-   * Top team performances for the "back to back team" mode, ranked by rounds
-   * survived (highest first; older runs win ties). Each game is one team entry —
-   * the duo (or lone solo player) — rather than two per-hoop performances.
-   * Rounds survived is stored in the score columns by the game service.
-   * Returns an empty list when Supabase is not configured.
+   * Top team performances for a rounds-survived mode (the co-operative
+   * "back to back team" board, or the single-player "back to back solo" board),
+   * ranked by rounds survived (highest first; older runs win ties). Each game is
+   * one team entry — the duo (or lone solo player) — rather than two per-hoop
+   * performances. Rounds survived is stored in the score columns by the game
+   * service. Returns an empty list when Supabase is not configured.
    */
-  async topTeamScores(limit = 3): Promise<TeamLeaderboardEntry[]> {
+  async topTeamScores(mode: GameModeId, limit = 3): Promise<TeamLeaderboardEntry[]> {
     const client = this.supabase.client;
     if (!client) {
       return [];
@@ -157,7 +155,7 @@ export class LeaderboardService {
          hoop1_player:players!games_hoop1_player_id_fkey (id, name, color, created_at),
          hoop2_player:players!games_hoop2_player_id_fkey (id, name, color, created_at)`,
       )
-      .eq('mode', TEAM_MODE);
+      .eq('mode', mode);
 
     if (error) {
       throw new Error(error.message);
@@ -179,11 +177,11 @@ export class LeaderboardService {
   }
 
   /**
-   * The 1-based placement a team's rounds-survived earns on the team
-   * leaderboard (1 = top). Assumes the run has already been persisted, so its
-   * own row is counted. Returns null when Supabase is not configured.
+   * The 1-based placement a team's rounds-survived earns on a rounds-survived
+   * mode's leaderboard (1 = top). Assumes the run has already been persisted, so
+   * its own row is counted. Returns null when Supabase is not configured.
    */
-  async placementForTeamRounds(roundsSurvived: number): Promise<number | null> {
+  async placementForTeamRounds(mode: GameModeId, roundsSurvived: number): Promise<number | null> {
     const client = this.supabase.client;
     if (!client) {
       return null;
@@ -192,7 +190,7 @@ export class LeaderboardService {
     const { data, error } = await client
       .from('games')
       .select('hoop1_score, hoop1_player_id')
-      .eq('mode', TEAM_MODE);
+      .eq('mode', mode);
 
     if (error) {
       throw new Error(error.message);
