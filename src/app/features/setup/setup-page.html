@@ -36,12 +36,12 @@
         <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
           Game Mode
         </h2>
-        <div class="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <div class="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
           @for (group of groups; track group.id) {
             <button
               type="button"
               (click)="selectGroup(group)"
-              class="rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
+              class="w-64 shrink-0 snap-start rounded-2xl border-2 p-5 text-left transition active:scale-[0.98]"
               [class.border-orange-400]="groupId() === group.id"
               [class.border-slate-700]="groupId() !== group.id"
               [style.background-color]="
@@ -127,6 +127,11 @@
           <p class="rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400">
             Head-to-head — first to 3 strikes loses. No leaderboard for this mode.
           </p>
+        } @else if (isAttritionMode()) {
+          <div class="grid gap-4 sm:grid-cols-2">
+            <app-leaderboard [mode]="selectedMode()!" heading="Most Points" />
+            <app-leaderboard [mode]="selectedMode()!" metric="duration" heading="Lasted Longest" />
+          </div>
         } @else {
           <app-leaderboard [mode]="selectedMode()!" />
         }

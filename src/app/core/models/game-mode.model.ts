@@ -2,6 +2,7 @@
 export type GameModeId =
   | 'standard'
   | 'clutch'
+  | 'attrition'
   | 'back-to-back-solo'
   | 'back-to-back-vs'
   | 'back-to-back-team';
@@ -24,6 +25,26 @@ export interface ClutchConfig {
   thresholdSeconds: number;
   /** Points awarded per made shot once clutch time has begun. */
   pointsPerShot: number;
+}
+
+/**
+ * Configuration for the "Attrition" mode, where each player runs their own
+ * countdown clock instead of a single shared game timer. A made shot extends
+ * that player's clock and banks points (more when the clock is low); a player
+ * is done the moment their own clock hits zero, while the other plays on.
+ */
+export interface AttritionConfig {
+  /** Seconds each player's clock starts at. */
+  startSeconds: number;
+  /** Seconds added to a player's own clock for each made shot. */
+  secondsPerShot: number;
+  /**
+   * When a player's clock is *below* this many seconds at the moment a shot is
+   * made, the basket is worth {@link lowTimePoints} instead of the base value.
+   */
+  lowTimeThresholdSeconds: number;
+  /** Points a made shot is worth while the clock is under the low-time threshold. */
+  lowTimePoints: number;
 }
 
 /**
@@ -72,6 +93,13 @@ export interface GameMode {
    */
   clutch?: ClutchConfig;
   /**
+   * When set, this is the "Attrition" mode: each player runs an independent
+   * countdown clock rather than sharing one game timer. `durationSeconds` holds
+   * the starting clock value and `pointsPerShot` the base basket value; the
+   * rest of the rules live here. See {@link isAttrition}.
+   */
+  attrition?: AttritionConfig;
+  /**
    * When set, this is a turn-based "back to back" mode rather than a timed
    * scoring mode. `durationSeconds`/`pointsPerShot` are unused for these modes.
    * See {@link isBackToBack}.
@@ -82,6 +110,11 @@ export interface GameMode {
 /** True when a mode is one of the turn-based "back to back" strike modes. */
 export function isBackToBack(mode: GameMode): boolean {
   return !!mode.backToBack;
+}
+
+/** True when a mode is the per-player-clock "Attrition" mode. */
+export function isAttrition(mode: GameMode): boolean {
+  return !!mode.attrition;
 }
 
 /** All game modes available for selection on the setup screen. */
@@ -105,6 +138,22 @@ export const GAME_MODES: readonly GameMode[] = [
     requiresSoloPlayer: false,
     requiresTwoPlayers: false,
     clutch: { thresholdSeconds: 15, pointsPerShot: 3 },
+  },
+  {
+    id: 'attrition',
+    name: 'Attrition',
+    description:
+      'Each player races their own clock. Every basket banks 2 points and buys 2 more seconds — but sink one with under 7 seconds left and it’s worth 3.',
+    durationSeconds: 20,
+    pointsPerShot: 2,
+    requiresSoloPlayer: false,
+    requiresTwoPlayers: false,
+    attrition: {
+      startSeconds: 20,
+      secondsPerShot: 2,
+      lowTimeThresholdSeconds: 7,
+      lowTimePoints: 3,
+    },
   },
   {
     id: 'back-to-back-solo',
@@ -200,6 +249,13 @@ export const GAME_MODE_GROUPS: readonly GameModeGroup[] = [
     description: mode('clutch').description,
     icon: 'pi pi-clock',
     variants: [{ label: 'Clutch Time', mode: mode('clutch') }],
+  },
+  {
+    id: 'attrition',
+    name: 'Attrition',
+    description: mode('attrition').description,
+    icon: 'pi pi-hourglass',
+    variants: [{ label: 'Attrition', mode: mode('attrition') }],
   },
   {
     id: 'back-to-back',

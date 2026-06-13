@@ -14,6 +14,7 @@ import { InputText } from 'primeng/inputtext';
 
 import { PlayerService } from '../../core/services/player.service';
 import { GameService } from '../../core/services/game.service';
+import { AttritionService } from '../../core/services/attrition.service';
 import { BackToBackService } from '../../core/services/back-to-back.service';
 import { MqttService } from '../../core/services/mqtt.service';
 import { LeaderboardService } from '../../core/services/leaderboard.service';
@@ -22,6 +23,7 @@ import {
   GAME_MODE_GROUPS,
   GameMode,
   GameModeGroup,
+  isAttrition,
   isBackToBack,
 } from '../../core/models/game-mode.model';
 import { HoopId } from '../../core/models/game.model';
@@ -62,6 +64,7 @@ export class SetupPage {
   private readonly router = inject(Router);
   protected readonly playerService = inject(PlayerService);
   private readonly game = inject(GameService);
+  private readonly attrition = inject(AttritionService);
   private readonly backToBack = inject(BackToBackService);
   protected readonly mqtt = inject(MqttService);
   private readonly leaderboardService = inject(LeaderboardService);
@@ -106,6 +109,9 @@ export class SetupPage {
 
   /** True when the selected mode is single-player only (one player, either basket). */
   protected readonly isSoloMode = computed(() => !!this.selectedMode()?.requiresSoloPlayer);
+
+  /** True when the selected mode is Attrition, which shows its own two boards. */
+  protected readonly isAttritionMode = computed(() => !!this.selectedMode()?.attrition);
 
   /** True when the selected mode is the co-operative "back to back team" mode (not solo). */
   protected readonly isTeamMode = computed(
@@ -258,6 +264,13 @@ export class SetupPage {
     if (isBackToBack(mode)) {
       this.backToBack.configure({ mode, hoop1Player, hoop2Player });
       void this.router.navigate(['/back-to-back']);
+      return;
+    }
+
+    // Attrition's per-player clocks run on their own engine + screens.
+    if (isAttrition(mode)) {
+      this.attrition.configure({ mode, hoop1Player, hoop2Player });
+      void this.router.navigate(['/attrition']);
       return;
     }
 

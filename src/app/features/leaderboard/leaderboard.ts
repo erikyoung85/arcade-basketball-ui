@@ -8,8 +8,9 @@ import { PlayerBadge } from '../../shared/player-badge';
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 /**
- * Shows the top scores for a single game mode. Re-fetches whenever the
- * selected mode changes.
+ * Shows the top performances for a single game mode, ranked either by points
+ * scored (the default) or by how long a player lasted (`metric="duration"`,
+ * used by Attrition). Re-fetches whenever the mode or metric changes.
  */
 @Component({
   selector: 'app-leaderboard',
@@ -19,12 +20,12 @@ const MEDALS = ['🥇', '🥈', '🥉'];
     <section>
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">
         <i class="pi pi-trophy text-orange-400"></i>
-        Leaderboard — {{ mode().name }}
+        {{ heading() ?? 'Leaderboard — ' + mode().name }}
       </h2>
 
       @if (entries.isLoading()) {
         <p class="rounded-2xl border-2 border-slate-700 p-5 text-center text-slate-400">
-          Loading top scores…
+          Loading…
         </p>
       } @else if (entries.error()) {
         <p class="rounded-2xl border-2 border-slate-700 p-5 text-center text-slate-400">
@@ -46,7 +47,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
               <span class="w-10 shrink-0 text-center text-2xl font-black">{{ rank(i) }}</span>
               <app-player-badge [player]="entry.player" [size]="48" />
               <span class="flex-1 truncate text-xl font-bold">{{ entry.player.name }}</span>
-              <span class="text-2xl font-black text-orange-400">{{ entry.score }}</span>
+              <span class="text-2xl font-black text-orange-400">{{ formatValue(entry.score) }}</span>
             </li>
           }
         </ol>
@@ -57,15 +58,29 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 export class Leaderboard {
   private readonly leaderboard = inject(LeaderboardService);
 
-  /** The game mode to rank scores for. */
+  /** The game mode to rank performances for. */
   readonly mode = input.required<GameMode>();
 
+  /** What to rank by: points scored (default) or seconds lasted. */
+  readonly metric = input<'points' | 'duration'>('points');
+
+  /** Optional heading override; defaults to "Leaderboard — {mode name}". */
+  readonly heading = input<string>();
+
   protected readonly entries = resource({
-    params: () => this.mode().id,
-    loader: ({ params }) => this.leaderboard.topScores(params, 3),
+    params: () => ({ mode: this.mode().id, metric: this.metric() }),
+    loader: ({ params }) =>
+      params.metric === 'duration'
+        ? this.leaderboard.topDurations(params.mode, 3)
+        : this.leaderboard.topScores(params.mode, 3),
   });
 
   protected rank(index: number): string {
     return MEDALS[index] ?? `${index + 1}`;
+  }
+
+  /** Render a value with a unit suffix for durations (e.g. "26s"). */
+  protected formatValue(score: number): string {
+    return this.metric() === 'duration' ? `${score}s` : `${score}`;
   }
 }

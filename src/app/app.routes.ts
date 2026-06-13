@@ -20,6 +20,18 @@ export const routes: Routes = [
     title: 'Results',
   },
   {
+    path: 'attrition',
+    loadComponent: () =>
+      import('./features/attrition/attrition-page').then((m) => m.AttritionPage),
+    title: 'Attrition',
+  },
+  {
+    path: 'attrition/results',
+    loadComponent: () =>
+      import('./features/attrition/attrition-results-page').then((m) => m.AttritionResultsPage),
+    title: 'Attrition · Results',
+  },
+  {
     path: 'back-to-back',
     loadComponent: () =>
       import('./features/back-to-back/back-to-back-page').then((m) => m.BackToBackPage),

@@ -36,6 +36,14 @@ export interface GameResult {
   hoop1Score: number;
   hoop2Score: number;
   /**
+   * How long each player was actually shooting, in seconds. Only set for modes
+   * where players can finish at different times (Attrition, where each runs an
+   * independent clock); undefined for shared-clock modes. A null/undefined hoop
+   * means that hoop had no player.
+   */
+  hoop1DurationSeconds?: number;
+  hoop2DurationSeconds?: number;
+  /**
    * Winning player. Null on a tie, and always null for a single-player game
    * (there is no opponent to beat — see {@link isSinglePlayer}).
    */

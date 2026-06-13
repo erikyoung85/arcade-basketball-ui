@@ -1,0 +1,117 @@
+@if (game.setup(); as setup) {
+  <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
+    <!-- Hoop panels (driven by the hoop sensors over MQTT). Each player runs
+         their own clock; a solo game shows just the one manned hoop, full width. -->
+    <div class="grid flex-1" [class.grid-cols-2]="!game.isSinglePlayer()">
+      @for (hoop of [1, 2]; track hoop) {
+        @let isHoop1 = hoop === 1;
+        @let player = isHoop1 ? setup.hoop1Player : setup.hoop2Player;
+        @let score = isHoop1 ? game.hoop1Score() : game.hoop2Score();
+        @let shots = isHoop1 ? game.hoop1Shots() : game.hoop2Shots();
+        @let seconds = isHoop1 ? game.hoop1SecondsRemaining() : game.hoop2SecondsRemaining();
+        @let progress = isHoop1 ? game.hoop1Progress() : game.hoop2Progress();
+        @let active = isHoop1 ? game.hoop1Active() : game.hoop2Active();
+        @let lowTime = isHoop1 ? game.hoop1LowTime() : game.hoop2LowTime();
+        @if (player) {
+        <div
+          class="relative flex select-none flex-col items-center justify-center gap-4 transition"
+          [class.border-r]="isHoop1 && !game.isSinglePlayer()"
+          [class.border-slate-800]="isHoop1 && !game.isSinglePlayer()"
+          [class.opacity-50]="game.status() === 'running' && !active"
+          [style.background]="
+            'radial-gradient(circle at 50% 35%, ' + player.color + '33, transparent 70%)'
+          "
+        >
+          <!-- Player header -->
+          <div class="flex flex-col items-center gap-2">
+            <app-player-badge [player]="player" [size]="64" />
+            <span class="text-2xl font-bold">{{ player.name }}</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Hoop {{ hoop }}
+            </span>
+          </div>
+
+          <!-- Per-player clock -->
+          <div class="flex flex-col items-center gap-1">
+            <span
+              class="text-5xl font-black tabular-nums"
+              [class.text-red-500]="lowTime"
+              [class.text-slate-500]="game.status() === 'running' && !active"
+            >
+              {{ seconds }}<span class="text-2xl">s</span>
+            </span>
+            <div class="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
+              <div
+                class="h-full transition-[width] duration-100 ease-linear"
+                [class.bg-emerald-400]="!lowTime"
+                [class.bg-red-500]="lowTime"
+                [style.width.%]="progress * 100"
+              ></div>
+            </div>
+            @if (active && lowTime) {
+              <span class="mt-0.5 animate-pulse text-xs font-black uppercase tracking-[0.2em] text-red-500">
+                🔥 3 pts
+              </span>
+            }
+          </div>
+
+          <!-- Score -->
+          <div class="text-center leading-none">
+            <span class="block text-[6rem] font-black tabular-nums sm:text-[8rem]">{{ score }}</span>
+            <span class="text-lg text-slate-400">{{ shots }} {{ shots === 1 ? 'basket' : 'baskets' }}</span>
+          </div>
+
+          <!-- Out badge — clock emptied, score locked -->
+          @if (game.status() === 'running' && !active) {
+            <span class="rounded-full bg-red-500/90 px-4 py-1 text-sm font-black uppercase tracking-widest text-white">
+              Out — score locked
+            </span>
+          }
+
+          <!-- Undo (corrects a false sensor read) -->
+          @if (shots > 0 && active) {
+            <button
+              type="button"
+              (click)="undoShot(isHoop1 ? 1 : 2)"
+              class="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition active:scale-90 hover:bg-white/20"
+              aria-label="Undo last basket"
+            >
+              <i class="pi pi-undo text-xl"></i>
+            </button>
+          }
+        </div>
+        }
+      }
+    </div>
+
+    <!-- Sensor connection status (overlay, top-left) -->
+    <div class="absolute left-4 top-4">
+      <app-mqtt-status-indicator />
+    </div>
+
+    <!-- Mode header (overlay, centered top) -->
+    <div class="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2">
+      <div class="flex flex-col items-center rounded-2xl bg-slate-900/80 px-8 py-3 shadow-lg ring-1 ring-white/10 backdrop-blur">
+        <span class="text-xs font-semibold uppercase tracking-widest text-slate-400">{{ setup.mode.name }}</span>
+        <span class="text-sm text-slate-300">Outlast your clock</span>
+      </div>
+    </div>
+
+    <!-- Preparing overlay — shown while the game's sounds are downloaded so
+         audio isn't delayed mid-game on a slow connection. -->
+    @if (game.status() === 'preparing') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-slate-950/90 backdrop-blur-sm">
+        <i class="pi pi-spin pi-spinner text-6xl text-orange-400"></i>
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Preparing…</span>
+      </div>
+    }
+
+    <!-- Pre-game countdown overlay -->
+    @if (game.status() === 'countdown') {
+      <div class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+        <span class="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Get Ready</span>
+        <span class="text-[12rem] font-black leading-none text-white">{{ game.countdownValue() }}</span>
+      </div>
+    }
+  </div>
+}

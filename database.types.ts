@@ -18,9 +18,11 @@ export type Database = {
         Row: {
           created_at: string
           duration_seconds: number
+          hoop1_duration_seconds: number | null
           hoop1_player_id: string | null
           hoop1_score: number
           hoop1_shots: number
+          hoop2_duration_seconds: number | null
           hoop2_player_id: string | null
           hoop2_score: number
           hoop2_shots: number
@@ -31,9 +33,11 @@ export type Database = {
         Insert: {
           created_at?: string
           duration_seconds: number
+          hoop1_duration_seconds?: number | null
           hoop1_player_id?: string | null
           hoop1_score?: number
           hoop1_shots?: number
+          hoop2_duration_seconds?: number | null
           hoop2_player_id?: string | null
           hoop2_score?: number
           hoop2_shots?: number
@@ -44,9 +48,11 @@ export type Database = {
         Update: {
           created_at?: string
           duration_seconds?: number
+          hoop1_duration_seconds?: number | null
           hoop1_player_id?: string | null
           hoop1_score?: number
           hoop1_shots?: number
+          hoop2_duration_seconds?: number | null
           hoop2_player_id?: string | null
           hoop2_score?: number
           hoop2_shots?: number

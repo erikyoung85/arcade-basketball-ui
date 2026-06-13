@@ -74,6 +74,51 @@ export class LeaderboardService {
   }
 
   /**
+   * The top "lasted the longest" performances for a game mode, longest first.
+   * Ranks each hoop by how long that player was actually shooting (the
+   * `hoopN_duration_seconds` columns), which only the Attrition mode records.
+   * Rows without a recorded duration are skipped. Older runs win ties. Returns
+   * an empty list when Supabase is not configured.
+   */
+  async topDurations(mode: GameModeId, limit = 3): Promise<LeaderboardEntry[]> {
+    const client = this.supabase.client;
+    if (!client) {
+      return [];
+    }
+
+    const { data, error } = await client
+      .from('games')
+      .select(
+        `created_at,
+         hoop1_duration_seconds,
+         hoop2_duration_seconds,
+         hoop1_player:players!games_hoop1_player_id_fkey (id, name, color, created_at),
+         hoop2_player:players!games_hoop2_player_id_fkey (id, name, color, created_at)`,
+      )
+      .eq('mode', mode);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const entries: LeaderboardEntry[] = [];
+    for (const game of (data ?? []) as unknown as DurationGameRow[]) {
+      if (game.hoop1_player && game.hoop1_duration_seconds != null) {
+        entries.push(toEntry(game.hoop1_player, game.hoop1_duration_seconds, game.created_at));
+      }
+      if (game.hoop2_player && game.hoop2_duration_seconds != null) {
+        entries.push(toEntry(game.hoop2_player, game.hoop2_duration_seconds, game.created_at));
+      }
+    }
+
+    // Longest run first; older performances win ties (they got there first).
+    entries.sort(
+      (a, b) => b.score - a.score || a.playedAt.localeCompare(b.playedAt),
+    );
+    return entries.slice(0, limit);
+  }
+
+  /**
    * The 1-based placement a score earns on a mode's leaderboard (1 = top).
    * Ranking matches {@link topScores}: every recorded hoop performance counts,
    * and ties are broken by recency, so a freshly-played score sits below any
@@ -202,6 +247,15 @@ export class LeaderboardService {
     }
     return placement;
   }
+}
+
+/** A `games` row with both players embedded and each hoop's shooting duration. */
+interface DurationGameRow {
+  created_at: string;
+  hoop1_duration_seconds: number | null;
+  hoop2_duration_seconds: number | null;
+  hoop1_player: EmbeddedPlayer | null;
+  hoop2_player: EmbeddedPlayer | null;
 }
 
 /** A team `games` row with both players embedded; score holds rounds survived. */
