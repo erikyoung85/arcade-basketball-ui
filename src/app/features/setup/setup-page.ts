@@ -283,4 +283,9 @@ export class SetupPage {
     this.sensor.enterDebugMode();
     void this.router.navigate(['/test']);
   }
+
+  /** Fully reload the browser page. */
+  protected refresh(): void {
+    window.location.reload();
+  }
 }

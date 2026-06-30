@@ -4,14 +4,23 @@
          and results live on their own routes). -->
     <div class="mb-6 flex items-center justify-between gap-3">
       <app-sensor-status-indicator />
-      <p-button
-        label="Test Mode"
-        icon="pi pi-wrench"
-        severity="secondary"
-        [text]="true"
-        [disabled]="!sensorsReady()"
-        (onClick)="openTestMode()"
-      />
+      <div class="flex items-center gap-3">
+        <p-button
+          label="Refresh"
+          icon="pi pi-refresh"
+          severity="secondary"
+          [text]="true"
+          (onClick)="refresh()"
+        />
+        <p-button
+          label="Test Mode"
+          icon="pi pi-wrench"
+          severity="secondary"
+          [text]="true"
+          [disabled]="!sensorsReady()"
+          (onClick)="openTestMode()"
+        />
+      </div>
     </div>
 
     <!-- Header -->
