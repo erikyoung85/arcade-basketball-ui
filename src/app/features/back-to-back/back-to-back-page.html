@@ -89,7 +89,7 @@
 
     <!-- Sensor connection status (overlay, top-left) -->
     <div class="absolute left-4 top-4">
-      <app-mqtt-status-indicator />
+      <app-sensor-status-indicator />
     </div>
 
     <!-- Round header (overlay, centered top) -->
@@ -145,5 +145,8 @@
         <span class="text-[12rem] font-black leading-none text-white">{{ game.countdownValue() }}</span>
       </div>
     }
+
+    <!-- Sensor-loss overlay: pauses play and waits for the sensors to reconnect -->
+    <app-sensor-connection-overlay [game]="game" />
   </div>
 }

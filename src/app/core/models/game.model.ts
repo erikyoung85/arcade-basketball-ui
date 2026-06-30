@@ -23,8 +23,16 @@ export interface GameSetup {
  *
  * `preparing` is a brief, pre-countdown state while the game's audio assets are
  * downloaded, so a slow connection can't delay sounds once play begins.
+ * `paused` is entered when the hoop sensors drop mid-game: the clock freezes
+ * until they reconnect, then a fresh countdown resumes play.
  */
-export type GameStatus = 'idle' | 'preparing' | 'countdown' | 'running' | 'finished';
+export type GameStatus =
+  | 'idle'
+  | 'preparing'
+  | 'countdown'
+  | 'running'
+  | 'paused'
+  | 'finished';
 
 /** The final outcome, computed when the timer reaches zero. */
 export interface GameResult {

@@ -13,14 +13,13 @@
  * only in memory (nothing is persisted). This keeps local development usable
  * before the backend is wired up.
  *
- * `mqttBrokerUrl` points at the local MQTT broker that publishes made-shot
- * events on the `basketball/shots` topic. Browsers can only speak MQTT over
- * WebSockets, so this must be a `ws://` / `wss://` URL — e.g. Mosquitto's
- * default WebSocket listener on port 9001.
+ * `sensorWebSocketUrl` points directly at the arcade hoop sensors' WebSocket
+ * server. The app talks to the sensors over this single connection — there is
+ * no broker in between — so it must be a `ws://` / `wss://` URL.
  */
 export const environment = {
   production: false,
   supabaseUrl: 'https://ulqlllosknuyhjasvtci.supabase.co',
   supabasePublishableKey: 'sb_publishable_ojLGNeAS8kqVw47wCo4ydQ_WBA0xi42',
-  mqttBrokerUrl: 'ws://raspberrypi.local/mqtt',
+  sensorWebSocketUrl: 'ws://arcade-hoop.local:81/',
 };

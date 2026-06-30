@@ -1,6 +1,6 @@
 @if (game.setup(); as setup) {
   <div class="relative flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-white">
-    <!-- Hoop score panels (driven by the hoop sensors over MQTT). A solo game
+    <!-- Hoop score panels (driven by the hoop sensors over WebSocket). A solo game
          shows just the one manned hoop, full width. -->
     <div class="grid flex-1" [class.grid-cols-2]="!game.isSinglePlayer()">
       @for (hoop of [1, 2]; track hoop) {
@@ -50,7 +50,7 @@
 
     <!-- Sensor connection status (overlay, top-left) -->
     <div class="absolute left-4 top-4">
-      <app-mqtt-status-indicator />
+      <app-sensor-status-indicator />
     </div>
 
     <!-- Timer header (overlay, centered top) -->
@@ -95,5 +95,8 @@
         <span class="text-[12rem] font-black leading-none text-white">{{ game.countdownValue() }}</span>
       </div>
     }
+
+    <!-- Sensor-loss overlay: pauses play and waits for the sensors to reconnect -->
+    <app-sensor-connection-overlay [game]="game" />
   </div>
 }

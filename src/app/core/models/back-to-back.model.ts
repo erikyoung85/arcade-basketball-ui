@@ -6,9 +6,18 @@ import { Player } from './player.model';
  * Lifecycle of a turn-based "back to back" game.
  *
  * `preparing` is a brief, pre-countdown state while the game's audio assets are
- * downloaded; `playing` covers the whole sequence of rounds and turns.
+ * downloaded; `playing` covers the whole sequence of rounds and turns. `paused`
+ * is entered when the hoop sensors drop mid-game: the run-loop is unwound and
+ * the current round is rolled back, then a fresh countdown replays it once the
+ * sensors reconnect.
  */
-export type BackToBackStatus = 'idle' | 'preparing' | 'countdown' | 'playing' | 'finished';
+export type BackToBackStatus =
+  | 'idle'
+  | 'preparing'
+  | 'countdown'
+  | 'playing'
+  | 'paused'
+  | 'finished';
 
 /** How a single player's turn resolved. */
 export type ShotOutcome = 'made' | 'missed';

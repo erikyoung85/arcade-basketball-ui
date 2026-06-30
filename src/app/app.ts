@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
-import { MqttService } from './core/services/mqtt.service';
+import { SensorService } from './core/services/sensor.service';
 import { SoundService } from './core/services/sound.service';
 
 @Component({
@@ -12,13 +12,16 @@ import { SoundService } from './core/services/sound.service';
 })
 export class App {
   private readonly soundService = inject(SoundService);
-  private readonly mqtt = inject(MqttService);
+  private readonly sensor = inject(SensorService);
   private readonly router = inject(Router);
 
   constructor() {
-    // Keep the broker link up app-wide so the sensor's mode is always tracked,
-    // no matter which screen the operator happens to be on.
-    this.mqtt.connect();
+    // Open the sensor link once, here, for the whole browser session. App is
+    // the root component and never torn down, so this single connection stays
+    // up across every screen and game — services only subscribe to its shots,
+    // they never open or close the socket. SensorService auto-reconnects on its
+    // own if the link ever drops.
+    this.sensor.connect();
 
     document.addEventListener(
       'click',
@@ -33,7 +36,7 @@ export class App {
     // production. `router.url` is read live (it isn't a signal) so this only
     // re-runs on a mode change, never on the navigations it triggers.
     effect(() => {
-      const mode = this.mqtt.mode();
+      const mode = this.sensor.mode();
       const onTestPage = this.router.url.startsWith('/test');
       if (mode === 'debug' && !onTestPage) {
         void this.router.navigate(['/test']);

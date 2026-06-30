@@ -5,7 +5,8 @@ import { BackToBackService } from '../../core/services/back-to-back.service';
 import { SoundService } from '../../core/services/sound.service';
 import { HoopId } from '../../core/models/game.model';
 import { PlayerBadge } from '../../shared/player-badge';
-import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
+import { SensorConnectionOverlay } from '../../shared/sensor-connection-overlay';
+import { SensorStatusIndicator } from '../../shared/sensor-status-indicator';
 
 /**
  * Active screen for the turn-based "back to back" modes. Players take turns
@@ -15,7 +16,7 @@ import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
  */
 @Component({
   selector: 'app-back-to-back-page',
-  imports: [PlayerBadge, MqttStatusIndicator],
+  imports: [PlayerBadge, SensorStatusIndicator, SensorConnectionOverlay],
   templateUrl: './back-to-back-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

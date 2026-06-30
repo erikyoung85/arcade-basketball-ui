@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { SupabaseService } from '../supabase/supabase.client';
-import { MqttService } from './mqtt.service';
+import { SensorService } from './sensor.service';
 import { SoundService } from './sound.service';
 import {
   BackToBackResult,
@@ -13,6 +13,7 @@ import {
   mannedHoops,
 } from '../models/back-to-back.model';
 import { GameSetup, HoopId } from '../models/game.model';
+import { PausableGame } from '../models/pausable-game';
 import { Player } from '../models/player.model';
 
 /** Length of the pre-game "3 · 2 · 1" countdown, in seconds. */
@@ -23,7 +24,7 @@ const TICK_MS = 100;
 const READY_MS = 1400;
 /**
  * Grace window after the shot clock hits zero in which a made shot still counts.
- * Absorbs the latency between the ball dropping and the sensor's MQTT message
+ * Absorbs the latency between the ball dropping and the sensor's message
  * arriving, so a buzzer-beater isn't unfairly scored as a miss.
  */
 const SHOT_GRACE_MS = 1000;
@@ -53,9 +54,9 @@ const STRIKE_ANNOUNCE_MS = 1500;
  * results routes. Mirrors {@link GameService} but for the turn-based modes.
  */
 @Injectable({ providedIn: 'root' })
-export class BackToBackService {
+export class BackToBackService implements PausableGame {
   private readonly supabase = inject(SupabaseService);
-  private readonly mqtt = inject(MqttService);
+  private readonly sensor = inject(SensorService);
   private readonly sound = inject(SoundService);
 
   private readonly _setup = signal<GameSetup | null>(null);
@@ -94,6 +95,11 @@ export class BackToBackService {
   readonly roundsSurvived = this._roundsSurvived.asReadonly();
   readonly roundOutcome = this._roundOutcome.asReadonly();
   readonly result = this._result.asReadonly();
+
+  /** True while a round is in progress, so a sensor drop now should pause it. */
+  readonly isLive = computed(() => this._status() === 'playing');
+  /** True while play is frozen, waiting for the sensors to reconnect. */
+  readonly isAwaitingSensors = computed(() => this._status() === 'paused');
 
   /** Whole seconds left on the shot clock (rounded up for display). */
   readonly secondsToShoot = computed(() => Math.ceil(this._turnMsRemaining() / 1000));
@@ -141,6 +147,12 @@ export class BackToBackService {
   private shotWindowCleanup: (() => void) | null = null;
   /** Bumped on each new game / reset so stale async run-loops abort. */
   private generation = 0;
+  /**
+   * Strike counts captured at the start of the current round. A sensor-loss
+   * pause rolls back to these so the resumed round replays cleanly, without
+   * double-counting a strike already incurred in the interrupted round.
+   */
+  private roundStartStrikes: { hoop1: number; hoop2: number; team: number } | null = null;
 
   // Resolves once the most recent finished game has been written to Supabase.
   private persistPromise: Promise<void> = Promise.resolve();
@@ -175,7 +187,8 @@ export class BackToBackService {
   startCountdown(): void {
     if (!this._setup() || (this._status() !== 'idle' && this._status() !== 'preparing')) return;
 
-    // Open the broker link now so shots are routed the moment play begins.
+    // Start routing shots now so they land the moment play begins. The socket
+    // itself is already connected app-wide.
     this.startListeningForShots();
 
     // Set countdown state and kick off the tick loop, which will transition to the first round.
@@ -220,14 +233,59 @@ export class BackToBackService {
     return this.persistPromise;
   }
 
+  /**
+   * Freeze the game because the hoop sensors dropped mid-round. Unwinds the
+   * async run-loop and rolls the current round back to its starting strike
+   * counts, so resuming replays that round from scratch without double-counting.
+   */
+  pauseForSensorLoss(): void {
+    if (this._status() !== 'playing') return;
+    this.abort();
+    if (this.roundStartStrikes) {
+      this._hoop1Strikes.set(this.roundStartStrikes.hoop1);
+      this._hoop2Strikes.set(this.roundStartStrikes.hoop2);
+      this._teamStrikes.set(this.roundStartStrikes.team);
+    }
+    this._roundOutcome.set(null);
+    this._turnOutcome.set(null);
+    this._activeHoop.set(null);
+    this._turnPhase.set('ready');
+    this._turnMsRemaining.set(0);
+    this._isPracticeTurn.set(false);
+    this._status.set('paused');
+  }
+
+  /**
+   * Resume after a sensor-loss pause: replay the 3·2·1 countdown, then re-enter
+   * the run-loop at the round that was interrupted.
+   */
+  resumeAfterSensorLoss(): void {
+    if (this._status() !== 'paused') return;
+    const round = this._round();
+    this._status.set('countdown');
+    this._countdownValue.set(COUNTDOWN_SECONDS);
+    this.clearInterval();
+    this.intervalId = setInterval(() => {
+      const next = this._countdownValue() - 1;
+      if (next <= 0) {
+        this.clearInterval();
+        void this.runGame(round);
+      } else {
+        this._countdownValue.set(next);
+      }
+    }, 1000);
+  }
+
   // --- the round/turn run-loop ---------------------------------------------
 
   /**
    * The heart of the game: loop round by round, running each manned hoop's turn
    * in order, resolving strikes, and ending when the loss condition is met. A
-   * `generation` token lets reset() abort a run cleanly mid-await.
+   * `generation` token lets reset() abort a run cleanly mid-await. Starts at
+   * `startRound` (1 for a fresh game, or the current round when resuming after a
+   * sensor-loss pause), leaving the strike/survived counts untouched.
    */
-  private async runGame(): Promise<void> {
+  private async runGame(startRound = 1): Promise<void> {
     const setup = this._setup();
     if (!setup?.mode.backToBack) return;
     const myGen = this.generation;
@@ -235,11 +293,17 @@ export class BackToBackService {
     const team = setup.mode.backToBack.team;
 
     this._status.set('playing');
-    let round = 1;
+    let round = startRound;
     while (true) {
       this._round.set(round);
       this._roundOutcome.set(null);
       this._isPracticeTurn.set(false);
+      // Snapshot strikes so a mid-round pause can roll back to a clean round.
+      this.roundStartStrikes = {
+        hoop1: this._hoop1Strikes(),
+        hoop2: this._hoop2Strikes(),
+        team: this._teamStrikes(),
+      };
 
       const ended = team
         ? await this.runTeamRound(hoops, myGen)
@@ -314,7 +378,7 @@ export class BackToBackService {
   /**
    * Run one player's turn: a made shot counts across the whole turn — during
    * the "you're up" beat, the visible shot clock, and a short grace window
-   * after it (covering MQTT latency on a buzzer-beater). Only if no shot lands
+   * after it (covering sensor latency on a buzzer-beater). Only if no shot lands
    * across all three is it a miss.
    */
   private async runTurn(hoop: HoopId, myGen: number, practice: boolean): Promise<ShotOutcome> {
@@ -338,7 +402,7 @@ export class BackToBackService {
       if ((await this.waitForShot(hoop, clockMs, myGen, true)) === 'made') {
         outcome = 'made';
       } else if (myGen === this.generation) {
-        // 3. Grace window for a late (MQTT-delayed) basket.
+        // 3. Grace window for a late (sensor-delayed) basket.
         if ((await this.waitForShot(hoop, SHOT_GRACE_MS, myGen, false)) === 'made') {
           outcome = 'made';
         }
@@ -549,14 +613,17 @@ export class BackToBackService {
     }
   }
 
-  /** Connect to the broker and route incoming shot events into the live turn. */
+  /**
+   * Route incoming shot events into the live turn. The sensor WebSocket is
+   * opened once, app-wide (see App), and stays connected across games — we only
+   * attach/detach our subscription here, never the socket itself.
+   */
   private startListeningForShots(): void {
-    this.mqtt.connect();
     this.shotSub?.unsubscribe();
-    this.shotSub = this.mqtt.shots$.subscribe((event) => this.shotResolver?.(event.hoop));
+    this.shotSub = this.sensor.shots$.subscribe((event) => this.shotResolver?.(event.hoop));
   }
 
-  /** Tear down the shot subscription and close the broker connection. */
+  /** Detach the shot subscription, leaving the shared socket connected. */
   private stopListeningForShots(): void {
     this.shotSub?.unsubscribe();
     this.shotSub = null;

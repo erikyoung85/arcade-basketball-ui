@@ -2,8 +2,9 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { SupabaseService } from '../supabase/supabase.client';
-import { MqttService } from './mqtt.service';
+import { SensorService } from './sensor.service';
 import { GameResult, GameSetup, GameStatus, HoopId } from '../models/game.model';
+import { PausableGame } from '../models/pausable-game';
 
 /** Length of the pre-game "3 · 2 · 1 · GO" countdown, in seconds. */
 const COUNTDOWN_SECONDS = 3;
@@ -19,9 +20,9 @@ const TICK_MS = 100;
  * results routes.
  */
 @Injectable({ providedIn: 'root' })
-export class GameService {
+export class GameService implements PausableGame {
   private readonly supabase = inject(SupabaseService);
-  private readonly mqtt = inject(MqttService);
+  private readonly sensor = inject(SensorService);
 
   private readonly _setup = signal<GameSetup | null>(null);
   private readonly _status = signal<GameStatus>('idle');
@@ -43,6 +44,11 @@ export class GameService {
 
   readonly hoop1Shots = computed(() => this._hoop1ShotPoints().length);
   readonly hoop2Shots = computed(() => this._hoop2ShotPoints().length);
+
+  /** True while the clock is live, so a sensor drop now should pause the game. */
+  readonly isLive = computed(() => this._status() === 'running');
+  /** True while play is frozen, waiting for the sensors to reconnect. */
+  readonly isAwaitingSensors = computed(() => this._status() === 'paused');
 
   /** Whole seconds left on the game clock (rounded up for display). */
   readonly secondsRemaining = computed(() => Math.ceil(this._timeRemainingMs() / 1000));
@@ -112,8 +118,8 @@ export class GameService {
     this._status.set('countdown');
     this._countdownValue.set(COUNTDOWN_SECONDS);
 
-    // Open the broker link now so it's ready by the time play begins. Shots
-    // are ignored until the status is 'running' (see recordShot).
+    // Start routing shots now; they're ignored until the status is 'running'
+    // (see recordShot). The socket itself is already connected app-wide.
     this.startListeningForShots();
 
     this.clearTimer();
@@ -130,7 +136,7 @@ export class GameService {
 
   /**
    * Record a made shot on the given hoop while the game is running. Driven by
-   * `basketball/shots` events from the MQTT broker (see startListeningForShots).
+   * made-shot events from the sensors (see startListeningForShots).
    */
   recordShot(hoop: HoopId): void {
     if (this._status() !== 'running') return;
@@ -190,10 +196,17 @@ export class GameService {
   private beginPlay(): void {
     const setup = this._setup();
     if (!setup) return;
-
-    this._status.set('running');
     this._timeRemainingMs.set(setup.mode.durationSeconds * 1000);
+    this.startClock();
+  }
 
+  /**
+   * Start (or restart) the game clock from whatever time is on it now. Used both
+   * to begin play and to resume after a sensor-loss pause, so it never resets
+   * the remaining time itself — the caller decides that.
+   */
+  private startClock(): void {
+    this._status.set('running');
     this.clearTimer();
     this.intervalId = setInterval(() => {
       const remaining = this._timeRemainingMs() - TICK_MS;
@@ -204,6 +217,30 @@ export class GameService {
         this._timeRemainingMs.set(remaining);
       }
     }, TICK_MS);
+  }
+
+  /** Freeze the game clock because the hoop sensors dropped mid-game. */
+  pauseForSensorLoss(): void {
+    if (this._status() !== 'running') return;
+    this.clearTimer();
+    this._status.set('paused');
+  }
+
+  /** Resume after a sensor-loss pause: replay the 3·2·1 countdown, then play on. */
+  resumeAfterSensorLoss(): void {
+    if (this._status() !== 'paused') return;
+    this._status.set('countdown');
+    this._countdownValue.set(COUNTDOWN_SECONDS);
+    this.clearTimer();
+    this.intervalId = setInterval(() => {
+      const next = this._countdownValue() - 1;
+      if (next <= 0) {
+        this.clearTimer();
+        this.startClock(); // Continues from the frozen time on the clock.
+      } else {
+        this._countdownValue.set(next);
+      }
+    }, 1000);
   }
 
   private finish(): void {
@@ -276,17 +313,19 @@ export class GameService {
     }
   }
 
-  /** Connect to the broker and route incoming shot events into the score. */
+  /**
+   * Route incoming shot events into the score. The sensor WebSocket is opened
+   * once, app-wide (see App), and stays connected across games — we only
+   * attach/detach our subscription here, never the socket itself.
+   */
   private startListeningForShots(): void {
-    this.mqtt.connect();
     this.shotSub?.unsubscribe();
-    this.shotSub = this.mqtt.shots$.subscribe((event) => this.recordShot(event.hoop));
+    this.shotSub = this.sensor.shots$.subscribe((event) => this.recordShot(event.hoop));
   }
 
-  /** Tear down the shot subscription and close the broker connection. */
+  /** Detach the shot subscription, leaving the shared socket connected. */
   private stopListeningForShots(): void {
     this.shotSub?.unsubscribe();
     this.shotSub = null;
-    this.mqtt.disconnect();
   }
 }

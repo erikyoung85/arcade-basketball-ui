@@ -1,9 +1,9 @@
 import { HoopId } from './game.model';
 
-/** The hoop labels used in the `basketball/shots` MQTT payload. */
+/** The hoop labels used in the sensor's made-shot payload. */
 export type RawHoop = 'HOOP_1' | 'HOOP_2';
 
-/** Raw JSON payload published on the `basketball/shots` topic. */
+/** Raw JSON made-shot payload the sensor pushes over the WebSocket. */
 export interface RawShotPayload {
   hoop: RawHoop;
   /** Epoch milliseconds the sensor detected the made shot. */

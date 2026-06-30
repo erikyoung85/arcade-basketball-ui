@@ -16,7 +16,7 @@ import { PlayerService } from '../../core/services/player.service';
 import { GameService } from '../../core/services/game.service';
 import { AttritionService } from '../../core/services/attrition.service';
 import { BackToBackService } from '../../core/services/back-to-back.service';
-import { MqttService } from '../../core/services/mqtt.service';
+import { SensorService } from '../../core/services/sensor.service';
 import { LeaderboardService } from '../../core/services/leaderboard.service';
 import { SetupStateService } from '../../core/services/setup-state.service';
 import {
@@ -29,7 +29,7 @@ import {
 import { HoopId } from '../../core/models/game.model';
 import { Player } from '../../core/models/player.model';
 import { PlayerBadge } from '../../shared/player-badge';
-import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
+import { SensorStatusIndicator } from '../../shared/sensor-status-indicator';
 import { Leaderboard } from '../leaderboard/leaderboard';
 import { TeamLeaderboard } from '../leaderboard/team-leaderboard';
 
@@ -53,7 +53,7 @@ import { TeamLeaderboard } from '../leaderboard/team-leaderboard';
     Dialog,
     InputText,
     PlayerBadge,
-    MqttStatusIndicator,
+    SensorStatusIndicator,
     Leaderboard,
     TeamLeaderboard,
   ],
@@ -66,7 +66,7 @@ export class SetupPage {
   private readonly game = inject(GameService);
   private readonly attrition = inject(AttritionService);
   private readonly backToBack = inject(BackToBackService);
-  protected readonly mqtt = inject(MqttService);
+  protected readonly sensor = inject(SensorService);
   private readonly leaderboardService = inject(LeaderboardService);
   private readonly setupState = inject(SetupStateService);
 
@@ -82,9 +82,9 @@ export class SetupPage {
   protected readonly hoop2Player = this.setupState.hoop2Player;
 
   constructor() {
-    // Establish the broker link up front so the operator can see sensor
-    // status here and can't start a game until the hoops are connected.
-    this.mqtt.connect();
+    // The sensor link is opened once, app-wide (see App), and stays connected
+    // for the life of the browser session — nothing to do here but read its
+    // status() to show connectivity and gate the Start button.
   }
 
   /** Which hoop the picker dialog is choosing for (null = closed). */
@@ -138,8 +138,8 @@ export class SetupPage {
     return (h1 && h2) || h1 || h2;
   });
 
-  /** The hoop sensors are reachable over MQTT. */
-  protected readonly sensorsReady = computed(() => this.mqtt.status() === 'connected');
+  /** The hoop sensors are reachable over the WebSocket. */
+  protected readonly sensorsReady = computed(() => this.sensor.status() === 'connected');
 
   /** A game may only start with valid players chosen and sensors connected. */
   protected readonly canStart = computed(() => this.playersReady() && this.sensorsReady());
@@ -280,7 +280,7 @@ export class SetupPage {
 
   /** Put the sensor into debug mode and open the test screen. */
   protected openTestMode(): void {
-    this.mqtt.enterDebugMode();
+    this.sensor.enterDebugMode();
     void this.router.navigate(['/test']);
   }
 }

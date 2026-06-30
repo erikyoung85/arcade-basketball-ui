@@ -1,7 +1,7 @@
 /**
- * Raw JSON payload published on the `basketball/debug/shots` topic while the
- * sensor is in debug mode. `eventLog` is human-readable diagnostic text for the
- * shot that was just taken and may contain newline characters.
+ * Raw JSON payload the sensor pushes over the WebSocket while in debug mode.
+ * `eventLog` is human-readable diagnostic text for the shot that was just taken
+ * and may contain newline characters.
  */
 export interface RawDebugShotPayload {
   hoop: string;

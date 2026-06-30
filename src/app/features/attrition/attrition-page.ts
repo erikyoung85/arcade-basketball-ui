@@ -5,18 +5,19 @@ import { AttritionService } from '../../core/services/attrition.service';
 import { SoundService } from '../../core/services/sound.service';
 import { HoopId } from '../../core/models/game.model';
 import { PlayerBadge } from '../../shared/player-badge';
-import { MqttStatusIndicator } from '../../shared/mqtt-status-indicator';
+import { SensorConnectionOverlay } from '../../shared/sensor-connection-overlay';
+import { SensorStatusIndicator } from '../../shared/sensor-status-indicator';
 
 /**
  * Active screen for the "Attrition" mode. Each hoop panel shows its player's
  * own countdown clock, score and basket count, driven by the hoop sensors over
- * MQTT (see AttritionService/MqttService). A player whose clock hits zero is
+ * a direct WebSocket (see AttritionService/SensorService). A player whose clock hits zero is
  * marked "Out" but the other plays on; when both clocks empty the user is
  * routed to the results page.
  */
 @Component({
   selector: 'app-attrition-page',
-  imports: [PlayerBadge, MqttStatusIndicator],
+  imports: [PlayerBadge, SensorStatusIndicator, SensorConnectionOverlay],
   templateUrl: './attrition-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -51,6 +52,10 @@ export class AttritionPage {
           break;
         case 'running':
           this.sound.startBackgroundMusic();
+          break;
+        case 'paused':
+          // Hush the music while we wait for the sensors; it restarts on resume.
+          this.sound.stopBackgroundMusic();
           break;
         case 'finished':
           this.sound.stopAll();
