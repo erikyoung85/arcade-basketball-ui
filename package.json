@@ -6,6 +6,8 @@
     "start": "ng serve --host 0.0.0.0 --port 4200",
     "build": "ng build",
     "build:raspberrypi": "ng build --configuration=production --base-href /arcadebasketball/",
+    "release:esp32": "ng build --configuration production && node scripts/release/index.mjs",
+    "package:esp32": "node scripts/release/index.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "supabase": "supabase",

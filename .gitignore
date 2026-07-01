@@ -2,6 +2,10 @@
 
 # Compiled output
 /dist
+/release
+# Generated release artifacts (Vercel static output)
+/public/releases
+/public/latest.json
 /tmp
 /out-tsc
 /bazel-out
