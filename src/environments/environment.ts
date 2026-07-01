@@ -21,5 +21,5 @@ export const environment = {
   production: false,
   supabaseUrl: 'https://ulqlllosknuyhjasvtci.supabase.co',
   supabasePublishableKey: 'sb_publishable_ojLGNeAS8kqVw47wCo4ydQ_WBA0xi42',
-  sensorWebSocketUrl: 'ws://arcade-hoop.local:81/',
+  sensorWebSocketUrl: 'ws://arcade-hoop.local/ws',
 };
