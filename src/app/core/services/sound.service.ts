@@ -46,7 +46,11 @@ interface BackgroundTrack {
  *             public/sounds/countdown.m4a. Until then a beep plays.
  */
 const SOUND_CONFIG = {
-  countdown: { src: 'sounds/countdown.m4a', volume: 0.9, loop: false },
+  countdown: {
+    src: 'https://ulqlllosknuyhjasvtci.supabase.co/storage/v1/object/public/arcade_basketball/sounds/countdown.m4a',
+    volume: 0.9,
+    loop: false,
+  },
 } satisfies Record<string, SoundSource>;
 
 /**
@@ -56,7 +60,11 @@ const SOUND_CONFIG = {
  * synthesized loop plays instead.
  */
 const BACKGROUND_MUSIC: BackgroundTrack[] = [
-  { src: 'sounds/music/jump-up-super-star.m4a', volume: 0.15, startSeconds: 0 },
+  {
+    src: 'https://ulqlllosknuyhjasvtci.supabase.co/storage/v1/object/public/arcade_basketball/music/jump-up-super-star.m4a',
+    volume: 0.15,
+    startSeconds: 0,
+  },
 ];
 
 /**
