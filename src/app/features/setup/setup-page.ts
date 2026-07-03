@@ -32,6 +32,10 @@ import { PlayerBadge } from '../../shared/player-badge';
 import { SensorStatusIndicator } from '../../shared/sensor-status-indicator';
 import { Leaderboard } from '../leaderboard/leaderboard';
 import { TeamLeaderboard } from '../leaderboard/team-leaderboard';
+// Release version — generated from package.json (see scripts/gen-version.mjs),
+// the same value the ESP32 release pipeline stamps into version.json /
+// latest.json, so the UI and the released bundle always agree.
+import { APP_VERSION } from '../../../environments/version';
 
 /**
  * Landing page, run as a two-step setup wizard:
@@ -71,6 +75,9 @@ export class SetupPage {
   private readonly setupState = inject(SetupStateService);
 
   protected readonly groups = GAME_MODE_GROUPS;
+
+  /** Release version shown at the top of the home page. */
+  protected readonly appVersion = APP_VERSION;
 
   // Backed by SetupStateService (root-provided) so the operator's choices —
   // and which wizard step they're on — persist after navigating away and

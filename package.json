@@ -1,12 +1,13 @@
 {
   "name": "arcade-basketball-ui",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --host 0.0.0.0 --port 4200",
-    "build": "ng build",
-    "build:raspberrypi": "ng build --configuration=production --base-href /arcadebasketball/",
-    "release:esp32": "ng build --configuration production && node scripts/release/index.mjs",
+    "gen:version": "node scripts/gen-version.mjs",
+    "start": "npm run gen:version && ng serve --host 0.0.0.0 --port 4200",
+    "build": "npm run gen:version && ng build",
+    "build:raspberrypi": "npm run gen:version && ng build --configuration=production --base-href /arcadebasketball/",
+    "release:esp32": "npm run gen:version && ng build --configuration production && node scripts/release/index.mjs",
     "package:esp32": "node scripts/release/index.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
